@@ -5,20 +5,20 @@
 
 class MotorController {
     public:
-        MotorController(uint8_t chip, uint8_t leftOne, uint8_t leftTwo, uint8_t rightOne, uint8_t rightTwo);
+        MotorController(const uint8_t& chip, const uint8_t& leftOne, const uint8_t& leftTwo, const uint8_t& rightOne, uint8_t rightTwo);
         ~MotorController();
 
-        bool setMotorSpeed(float left, float right);
+        bool setMotorSpeed(const float left, const float right);
         
     private:
-        uint8_t chip;
+        const uint8_t chip;
+        const uint8_t leftOne;
+        const uint8_t leftTwo;
+        const uint8_t rightOne;
+        const uint8_t rightTwo;
         int handle;
-        uint8_t leftOne;
-        uint8_t leftTwo;
-        uint8_t rightOne;
-        uint8_t rightTwo;
 
-        float speedToPWM(float speed);
+        float speedToPWM(const float speed);
 };
 
 #endif

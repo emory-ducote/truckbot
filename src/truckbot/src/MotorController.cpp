@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include "truckbot/MotorController.h"
 
-MotorController::MotorController(uint8_t chip, uint8_t leftOne, uint8_t leftTwo, uint8_t rightOne, uint8_t rightTwo)
+MotorController::MotorController(const uint8_t& chip, const uint8_t& leftOne, const uint8_t& leftTwo, const uint8_t& rightOne, uint8_t rightTwo)
     : chip(chip), leftOne(leftOne), leftTwo(leftTwo), rightOne(rightOne), rightTwo(rightTwo)
 { 
     handle = lgGpiochipOpen(chip);
@@ -25,7 +25,7 @@ MotorController::~MotorController()
     lgGpiochipClose(handle);
 }
 
-bool MotorController::setMotorSpeed(float left, float right)
+bool MotorController::setMotorSpeed(const float left, const float right)
 {
     float leftPWM = speedToPWM(left);
     float rightPWM = speedToPWM(right);
@@ -66,7 +66,7 @@ bool MotorController::setMotorSpeed(float left, float right)
     return true;
 }
 
-float MotorController::speedToPWM(float speed) 
+float MotorController::speedToPWM(const float speed) 
 {
     float lower = -0.99;
     float upper = 0.99;
