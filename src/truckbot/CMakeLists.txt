@@ -25,11 +25,18 @@ add_executable(motor_controller
   src/MotorController.cpp
 )
 
+add_executable(imu
+  src/IMUMiddleware.cpp
+  src/ICM20948.cpp
+)
+
 target_link_libraries(motor_controller lgpio)
+target_link_libraries(imu lgpio)
 ament_target_dependencies(motor_controller rclcpp std_msgs sensor_msgs)
 
 install(TARGETS
   motor_controller
+  imu
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

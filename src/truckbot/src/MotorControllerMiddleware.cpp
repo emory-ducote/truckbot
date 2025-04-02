@@ -34,10 +34,10 @@ int main(int argc, char** argv) {
 
 
   const uint8_t chip = 4;
-  const uint8_t leftOne = 26;
-  const uint8_t leftTwo = 19;
-  const uint8_t rightOne = 6;
-  const uint8_t rightTwo = 13;
+  const uint8_t leftOne = 23;
+  const uint8_t leftTwo = 24;
+  const uint8_t rightOne = 17;
+  const uint8_t rightTwo = 27;
 
   rclcpp::init(argc, argv);
   auto controller = std::make_shared<MotorController>(chip, leftOne, leftTwo, rightOne, rightTwo);
