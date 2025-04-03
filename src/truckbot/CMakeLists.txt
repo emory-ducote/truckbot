@@ -33,6 +33,7 @@ add_executable(imu
 target_link_libraries(motor_controller lgpio)
 target_link_libraries(imu lgpio)
 ament_target_dependencies(motor_controller rclcpp std_msgs sensor_msgs)
+ament_target_dependencies(imu rclcpp sensor_msgs)
 
 install(TARGETS
   motor_controller

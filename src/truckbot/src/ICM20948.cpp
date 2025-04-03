@@ -31,7 +31,7 @@
  #include <sys/ioctl.h>
  #include <linux/i2c-dev.h>
  
- ICM20948::ICM20948(int16_t *gyroOffset_1000dps_xyz, int16_t *accelOffset_32g_xyz, float *magOffset_xyz, float *magScale_xyz) {
+ ICM20948::ICM20948() {
      
      handle = lgI2cOpen(1, 0x68, 0);
      std::cout << handle << std::endl;
