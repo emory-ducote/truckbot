@@ -27,7 +27,7 @@ add_executable(motor_controller
 
 add_executable(imu
   src/IMUMiddleware.cpp
-  src/ICM20948.cpp
+  src/rpi5_ICM20948.cpp
 )
 
 target_link_libraries(motor_controller lgpio)
