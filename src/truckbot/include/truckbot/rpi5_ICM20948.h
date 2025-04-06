@@ -2,6 +2,7 @@
 #define RPI5_ICM20948_H
 
 #include <cstdint>
+#include <cmath>
 
 // ICM20948 Registers
 // Bank 0 register map
@@ -124,23 +125,20 @@
 #define MAG_CONTROL_2          0x31
 #define MAG_CONTROL_3          0x32
 #define MAG_DEVICE_ID          0x09
-
-// Bank shifts
-#define BANK_1_SHIFT           (1 << 7)
-#define BANK_2_SHIFT           (2 << 7)
-#define BANK_3_SHIFT           (3 << 7)
  
 class rpi5_ICM20948 {
     public:
         rpi5_ICM20948(uint8_t device);
-        int readAccel(float &ax, float &ay, float &az);
-        int readGyro(float &gx, float &gy, float &gz);    
+        int getMagnetometerData(float &ux, float &uy, float &uz);
+        int getAccelerometerAndGyroscopeData(float &ax, float &ay, float &az, float &gx, float &gy, float &gz); 
     private:
         /* Private variables */
         int handle; 
         float accelScale;
         float gyroScale;
-        const float RAD2DEG = (float) 4068 / 71;
+        const float DEG2RAD = M_PI / 180.0f;
+        const float G2MPSS = 9.80665f;
+
 };
  
  

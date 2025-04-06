@@ -20,15 +20,18 @@ class IMUPublisher : public rclcpp::Node {
         void timer_callback()
         {
             auto message = sensor_msgs::msg::Imu();
-            static float ax, ay, az, gx, gy, gz;
-            imu->readAccel(ax, ay, az);
-            imu->readGyro(gx, gy, gz);
+            float ax, ay, az, gx, gy, gz, ux, uy, uz;
+            imu->getAccelerometerAndGyroscopeData(ax, ay, az, gx, gy, gz);
+            imu->getMagnetometerData(ux, uy, uz);
             message.angular_velocity.x = gx;
             message.angular_velocity.y = gy;
             message.angular_velocity.z = gz;
             message.linear_acceleration.x = ax;
             message.linear_acceleration.y = ay;
             message.linear_acceleration.z = az;
+            message.orientation.x = ux;
+            message.orientation.y = uy;
+            message.orientation.z = uz;
             publisher_->publish(message);
         }
         rclcpp::TimerBase::SharedPtr timer_;
