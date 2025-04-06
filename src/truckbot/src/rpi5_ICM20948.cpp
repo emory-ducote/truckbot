@@ -47,9 +47,9 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
     gyroScale = 500.0f;
 
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    // lgI2cWriteByteData(handle, INT_ENABLE_1, 0x00);
-    // lgI2cWriteByteData(handle, INT_ENABLE, 0x00);
+    // enable the mag
     lgI2cWriteByteData(handle, INT_PIN_CFG, 0x02);
+
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
     lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
     lgI2cWriteByteData(handle, I2C_SLV0_REG, MAG_WHO_AM_I);
@@ -71,6 +71,27 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
 
     
    
+}
+
+uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) {
+    uint8_t result;
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
+    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C);
+    lgI2cWriteByteData(handle, I2C_SLV0_REG, reg);
+    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 0x01);
+    usleep(10);
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
+    return lgI2cReadByteData(handle, 0x3B);
+}
+
+void rpi5_ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
+    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C);
+    lgI2cWriteByteData(handle, I2C_SLV0_REG, reg);
+    lgI2cWriteByteData(handle, I2C_SLV0_DO, data);
+    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 0x01);
+    usleep(10);
+
 }
 
 int rpi5_ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {

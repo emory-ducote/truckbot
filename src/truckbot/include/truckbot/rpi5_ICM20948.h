@@ -129,6 +129,8 @@
 class rpi5_ICM20948 {
     public:
         rpi5_ICM20948(uint8_t device);
+        uint8_t readMagReg(uint8_t reg);
+        void writeMagReg(uint8_t reg, uint8_t data);
         int getMagnetometerData(float &ux, float &uy, float &uz);
         int getAccelerometerAndGyroscopeData(float &ax, float &ay, float &az, float &gx, float &gy, float &gz); 
     private:
