@@ -47,36 +47,23 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
     gyroScale = 500.0f;
 
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
+    
     // enable the mag
     lgI2cWriteByteData(handle, INT_PIN_CFG, 0x02);
 
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, MAG_WHO_AM_I);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 1);
-    usleep(100);
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    whoAmI = lgI2cReadByteData(handle, 0x3B);
+    whoAmI = readMagReg(MAG_WHO_AM_I);
     if (whoAmI != MAG_DEVICE_ID)
     {
         fprintf(stderr, "Device ID wrong for mag %x", (int) whoAmI);
     }
 
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, MAG_CONTROL_2);
-    lgI2cWriteByteData(handle, I2C_SLV0_DO, 0x08);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 0x01);
-    usleep(100);
-
-    
-   
+    writeMagReg(MAG_CONTROL_2, 0x08);
 }
 
 uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) {
     uint8_t result;
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C);
+    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
     lgI2cWriteByteData(handle, I2C_SLV0_REG, reg);
     lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 0x01);
     usleep(10);
