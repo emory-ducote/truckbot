@@ -129,6 +129,7 @@
 class rpi5_ICM20948 {
     public:
         rpi5_ICM20948(uint8_t device);
+        void resetMaster();
         uint8_t readMagReg(uint8_t reg);
         void writeMagReg(uint8_t reg, uint8_t data);
         int getMagnetometerData(float &ux, float &uy, float &uz);
@@ -140,6 +141,7 @@ class rpi5_ICM20948 {
         float gyroScale;
         const float DEG2RAD = M_PI / 180.0f;
         const float G2MPSS = 9.80665f;
+        const float duration = 100;
 
 };
  

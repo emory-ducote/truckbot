@@ -68,7 +68,9 @@ bool MotorController::setMotorSpeed(const float left, const float right)
 
 float MotorController::speedToPWM(const float speed) 
 {
-    float lower = -0.99;
-    float upper = 0.99;
+    // limit to 50 % to not saturate motors, also needs to be < 100%
+    float lower = -0.99 / 2.0; 
+    float upper = 0.99 / 2.0;
+    
     return std::abs(std::max(lower, std::min(speed, upper)) * 100.0);
 }

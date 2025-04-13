@@ -11,30 +11,22 @@
 #include <linux/i2c-dev.h>
  
 rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
+    uint8_t reg;
     handle = lgI2cOpen(1, device, 0);
     if (handle < 0) {
-        fprintf(stderr, "Error opening IMU at %X\n");
+        fprintf(stderr, "Error opening IMU\n");
     }     
 
+    resetMaster();
+
     // wake up device
-    lgI2cWriteByteData(handle, PWR_MGMT_1, 0x00);
-    usleep(10);
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
+    usleep(duration);
+    reg = lgI2cReadByteData(handle, PWR_MGMT_1);
+    usleep(duration);
+    lgI2cWriteByteData(handle, PWR_MGMT_1, reg & 0b10111111);
+    usleep(duration);
 
-    // auto get clock source
-    lgI2cWriteByteData(handle, PWR_MGMT_1, 0x01);
-
-    // disable accel/gyro
-    lgI2cWriteByteData(handle, PWR_MGMT_2, 0x3F);
-    // enable accel/gyro
-    lgI2cWriteByteData(handle, PWR_MGMT_2, 0x00);
-
-    // check if everything is functioning
-    uint8_t whoAmI = lgI2cReadByteData(handle, WHO_AM_I);
-    if (whoAmI != DEVICE_ID)
-    {
-        fprintf(stderr, "Device ID wrong for icm20948\n");
-    }
-    
     // select the second register bank
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x20);
 
@@ -46,71 +38,116 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
     lgI2cWriteByteData(handle, GYRO_CONFIG_1, 0x1B);    
     gyroScale = 500.0f;
 
+    // enable bypass mode
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    
-    // enable the mag
+    usleep(duration);
     lgI2cWriteByteData(handle, INT_PIN_CFG, 0x02);
+    usleep(duration);
 
+    // set to be stop between reads, clock to 345.60khz
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_MST_CTRL, 0x17);
+    usleep(duration);
+
+    // enable i2c master
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
+    usleep(duration);
+    reg = lgI2cReadByteData(handle, USER_CTRL);
+    lgI2cWriteByteData(handle, USER_CTRL, reg | 0b00100000);
+    usleep(duration);
+
+    // verify id
+    uint8_t whoAmI = lgI2cReadByteData(handle, WHO_AM_I);
+    if (whoAmI != DEVICE_ID)
+    {
+        fprintf(stderr, "Device ID wrong for icm20948\n");
+    }
+
+    // set mag to poweroff, sleep, then set to continuious mode 1
+    writeMagReg(MAG_CONTROL_2, 0x00);
+    usleep(duration);
+    writeMagReg(MAG_CONTROL_2, 0x02);
+    usleep(duration);
+
+    // verify mag ID
     whoAmI = readMagReg(MAG_WHO_AM_I);
     if (whoAmI != MAG_DEVICE_ID)
     {
-        fprintf(stderr, "Device ID wrong for mag %x", (int) whoAmI);
+        fprintf(stderr, "Device ID wrong for mag");
     }
-
-    writeMagReg(MAG_CONTROL_2, 0x08);
+    
+    // set up slave 0 to read into slave 0 data registers
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x8C);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV0_REG, 0x11);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x89);
 }
 
-uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) {
-    uint8_t result;
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, reg);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 0x01);
-    usleep(10);
+void rpi5_ICM20948::resetMaster() {
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    return lgI2cReadByteData(handle, 0x3B);
+    usleep(duration);
+    lgI2cWriteByteData(handle, PWR_MGMT_1, 0x80);
+    usleep(duration);
+    uint8_t reset = lgI2cReadByteData(handle, PWR_MGMT_1);
+    while (reset & 0b10000000) {
+        usleep(5);
+        reset = lgI2cReadByteData(handle, PWR_MGMT_1);
+    }
+}
+
+uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) { 
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV4_ADDR, 0x8C);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV4_REG, reg);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV4_CTRL, 0x80);
+    usleep(duration);
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
+    usleep(duration);
+    uint8_t reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
+    while (reset & 0b00100000) {
+        usleep(1000);
+        reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
+    }
+
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
+    usleep(duration);
+    return lgI2cReadByteData(handle, I2C_SLV4_DI);
 }
 
 void rpi5_ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, reg);
-    lgI2cWriteByteData(handle, I2C_SLV0_DO, data);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 0x01);
-    usleep(10);
-
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV4_ADDR, 0x0C);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV4_REG, reg);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV4_DO, data);
+    usleep(duration);
+    lgI2cWriteByteData(handle, I2C_SLV4_CTRL, 0x80);
+    usleep(duration);
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
+    usleep(duration);
+    uint8_t reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
+    while (reset & 0b00100000) {
+        usleep(duration);
+        reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
+    }
 }
 
 int rpi5_ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
     static char data[8];
     int16_t uiUx, uiUy, uiUz;
 
-    //case 0
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, MAG_STATUS_1);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 1);
-    // usleep(100);
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-
-    //case 2
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, MAG_XOUT_L);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 6);
-    // usleep(100);
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-
-    //case 3
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, MAG_XOUT_L);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 1);
-    // usleep(100);
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
     int success = lgI2cReadI2CBlockData(handle, 0x3B, data, 8);
-    // std::cout << std::hex << (int) (data[0] & 0x01) << std::endl;
-
+    
     uiUx = ((int16_t) data[1] << 8) | data[0];
     uiUy = ((int16_t) data[3] << 8) | data[2];
     uiUz = ((int16_t) data[5] << 8) | data[4];
@@ -118,14 +155,6 @@ int rpi5_ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
     ux = (uiUx / 20.0f) * 3.0f;
     uy = (uiUy / 20.0f) * 3.0f;
     uz = (uiUz / 20.0f) * 3.0f;
-
-    //case 4
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x0C | 0x80);
-    lgI2cWriteByteData(handle, I2C_SLV0_REG, MAG_STATUS_2);
-    lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x80 | 1);
-    // usleep(100);
-    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
 
     return success;
 }
