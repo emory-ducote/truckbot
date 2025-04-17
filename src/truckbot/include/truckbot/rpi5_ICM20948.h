@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <cmath>
+#include <eigen3/Eigen/Dense>
+
 
 // ICM20948 Registers
 // Bank 0 register map
@@ -129,20 +131,24 @@
 class rpi5_ICM20948 {
     public:
         rpi5_ICM20948(uint8_t device);
-        void resetMaster();
-        uint8_t readMagReg(uint8_t reg);
-        void writeMagReg(uint8_t reg, uint8_t data);
         int getMagnetometerData(float &ux, float &uy, float &uz);
         int getAccelerometerAndGyroscopeData(float &ax, float &ay, float &az, float &gx, float &gy, float &gz); 
+        void resetMaster();
     private:
         /* Private variables */
         int handle; 
         float accelScale;
         float gyroScale;
+        const int calibrateSamples = 40;
         const float DEG2RAD = M_PI / 180.0f;
         const float G2MPSS = 9.80665f;
-        const float duration = 100;
-
+        const int duration = 100;
+        Eigen::Vector3f accelOffset;
+        Eigen::Vector3f gyroOffset;
+        Eigen::Vector3f magOffset;
+        uint8_t readMagReg(uint8_t reg);
+        void writeMagReg(uint8_t reg, uint8_t data);
+        void calibrateSensor();
 };
  
  

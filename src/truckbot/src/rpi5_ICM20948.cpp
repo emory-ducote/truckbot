@@ -4,9 +4,12 @@
 #include <iostream>
 #include <lgpio.h>
 #include <unistd.h>
+#include <chrono>
+#include <thread>
 #include <stdio.h>
 #include <cstdint>
 #include <fcntl.h>
+#include <algorithm>
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
  
@@ -21,11 +24,11 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
 
     // wake up device
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     reg = lgI2cReadByteData(handle, PWR_MGMT_1);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, PWR_MGMT_1, reg & 0b10111111);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
 
     // select the second register bank
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x20);
@@ -40,22 +43,22 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
 
     // enable bypass mode
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, INT_PIN_CFG, 0x02);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
 
     // set to be stop between reads, clock to 345.60khz
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_MST_CTRL, 0x17);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
 
     // enable i2c master
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     reg = lgI2cReadByteData(handle, USER_CTRL);
     lgI2cWriteByteData(handle, USER_CTRL, reg | 0b00100000);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
 
     // verify id
     uint8_t whoAmI = lgI2cReadByteData(handle, WHO_AM_I);
@@ -66,9 +69,9 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
 
     // set mag to poweroff, sleep, then set to continuious mode 1
     writeMagReg(MAG_CONTROL_2, 0x00);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     writeMagReg(MAG_CONTROL_2, 0x02);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
 
     // verify mag ID
     whoAmI = readMagReg(MAG_WHO_AM_I);
@@ -79,19 +82,23 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
     
     // set up slave 0 to read into slave 0 data registers
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV0_ADDR, 0x8C);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV0_REG, 0x11);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV0_CTRL, 0x89);
+
+    usleep(10000);
+
+    calibrateSensor();
 }
 
 void rpi5_ICM20948::resetMaster() {
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, PWR_MGMT_1, 0x80);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     uint8_t reset = lgI2cReadByteData(handle, PWR_MGMT_1);
     while (reset & 0b10000000) {
         usleep(5);
@@ -101,15 +108,15 @@ void rpi5_ICM20948::resetMaster() {
 
 uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) { 
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_ADDR, 0x8C);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_REG, reg);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_CTRL, 0x80);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     uint8_t reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
     while (reset & 0b00100000) {
         usleep(1000);
@@ -117,26 +124,26 @@ uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) {
     }
 
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     return lgI2cReadByteData(handle, I2C_SLV4_DI);
 }
 
 void rpi5_ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_ADDR, 0x0C);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_REG, reg);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_DO, data);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_CTRL, 0x80);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
-    usleep(duration);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
     uint8_t reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
     while (reset & 0b00100000) {
-        usleep(duration);
+        std::this_thread::sleep_for(std::chrono::microseconds(duration));
         reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
     }
 }
@@ -152,9 +159,9 @@ int rpi5_ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
     uiUy = ((int16_t) data[3] << 8) | data[2];
     uiUz = ((int16_t) data[5] << 8) | data[4];
 
-    ux = (uiUx / 20.0f) * 3.0f;
-    uy = (uiUy / 20.0f) * 3.0f;
-    uz = (uiUz / 20.0f) * 3.0f;
+    ux = ((uiUx / 20.0f) * 3.0f) - magOffset.x();
+    uy = ((uiUy / 20.0f) * 3.0f) - magOffset.y();
+    uz = ((uiUz / 20.0f) * 3.0f) - magOffset.z();
 
     return success;
 }
@@ -174,13 +181,44 @@ int rpi5_ICM20948::getAccelerometerAndGyroscopeData(float &ax, float &ay, float 
     uiGx = (int16_t) (data[6] << 8) | data[7];
     uiGy = (int16_t) (data[8] << 8) | data[9];
     uiGz = (int16_t) (data[10] << 8) | data[11];
-    ax = uiAx / (32768.0f / accelScale) * G2MPSS;
-    ay = uiAy / (32768.0f / accelScale) * G2MPSS;
-    az = uiAz / (32768.0f / accelScale) * G2MPSS;
-    gx = uiGx / (32768.0f / gyroScale) * DEG2RAD;
-    gy = uiGy / (32768.0f / gyroScale) * DEG2RAD;
-    gz = uiGz / (32768.0f / gyroScale) * DEG2RAD;
+    ax = (uiAx / (32768.0f / accelScale) * G2MPSS) - accelOffset.x();
+    ay = (uiAy / (32768.0f / accelScale) * G2MPSS) - accelOffset.y();
+    az = (uiAz / (32768.0f / accelScale) * G2MPSS) - accelOffset.z();
+    gx = (uiGx / (32768.0f / gyroScale) * DEG2RAD) - gyroOffset.x();
+    gy = (uiGy / (32768.0f / gyroScale) * DEG2RAD) - gyroOffset.y();
+    gz = (uiGz / (32768.0f / gyroScale) * DEG2RAD) - gyroOffset.z();
 
     return success;
+}
+
+void rpi5_ICM20948::calibrateSensor() {
+    Eigen::Vector3f accelSum = Eigen::Vector3f::Zero();
+    Eigen::Vector3f gyroSum = Eigen::Vector3f::Zero();
+    Eigen::Vector3f magMin = Eigen::Vector3f::Constant(1e9);
+    Eigen::Vector3f magMax = Eigen::Vector3f::Constant(-1e9);
+
+    float ax, ay, az, gx, gy, gz, ux, uy, uz;
+    std::cout << "Starting calibration..." << std::endl;
+    for (int i = 0; i < calibrateSamples; ++i) {
+        getAccelerometerAndGyroscopeData(ax, ay, az, gx, gy, gz);
+        getMagnetometerData(ux, uy, uz);
+
+        Eigen::Vector3f accel(ax, ay, az);
+        Eigen::Vector3f gyro(gx, gy, gz);
+        Eigen::Vector3f mag(ux, uy, uz);
+
+        accelSum += accel;
+        gyroSum += gyro;
+        magMin = magMin.cwiseMin(mag);
+        magMax = magMax.cwiseMax(mag);
+
+        usleep(125000); // Sleep for 125ms
+    }
+    std::cout << "Finished calibration" << std::endl;
+
+    accelOffset = accelSum / calibrateSamples;
+    gyroOffset = gyroSum / calibrateSamples;
+    magOffset = (magMax + magMin) * 0.5f;
+    
 }
 

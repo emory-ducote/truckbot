@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include "truckbot/MotorController.h"
 
-MotorController::MotorController(const uint8_t& chip, const uint8_t& leftOne, const uint8_t& leftTwo, const uint8_t& rightOne, uint8_t rightTwo)
-    : chip(chip), leftOne(leftOne), leftTwo(leftTwo), rightOne(rightOne), rightTwo(rightTwo)
+MotorController::MotorController(const uint8_t& chip, const uint8_t& leftOne, const uint8_t& leftTwo, const uint8_t& rightOne, const uint8_t& rightTwo, const uint8_t& liftOne, const uint8_t& liftTwo)
+    : chip(chip), leftOne(leftOne), leftTwo(leftTwo), rightOne(rightOne), rightTwo(rightTwo), liftOne(liftOne), liftTwo(liftTwo)
 { 
     handle = lgGpiochipOpen(chip);
     if (handle < 0) {
@@ -16,6 +16,9 @@ MotorController::MotorController(const uint8_t& chip, const uint8_t& leftOne, co
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftTwo, 1);
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightOne, 1);
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightTwo, 1);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftOne, 1);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftTwo, 1);
+
 }
 
 MotorController::~MotorController()
@@ -73,4 +76,19 @@ float MotorController::speedToPWM(const float speed)
     float upper = 0.99 / 2.0;
     
     return std::abs(std::max(lower, std::min(speed, upper)) * 100.0);
+}
+
+bool MotorController::moveActuator(const bool direction)
+{
+    std::cout << "direction: " << direction << std::endl;
+    int command1 = 1;
+    int command2 = 0;
+    if (direction) {
+        int command1 = 0;
+        int command2 = 1;
+    }
+    lgGpioWrite(handle, liftOne, command1);
+    lgGpioWrite(handle, liftTwo, command2);
+
+    return true;
 }
