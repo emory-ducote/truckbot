@@ -1,5 +1,5 @@
-#ifndef RPI5_ICM20948_H
-#define RPI5_ICM20948_H
+#ifndef RPI55ICM20948_H
+#define RPI5ICM20948_H
 
 #include <cstdint>
 #include <cmath>
@@ -128,9 +128,9 @@
 #define MAG_CONTROL_3          0x32
 #define MAG_DEVICE_ID          0x09
  
-class rpi5_ICM20948 {
+class rpi5ICM20948 {
     public:
-        rpi5_ICM20948(uint8_t device);
+        rpi5ICM20948(uint8_t device);
         int getMagnetometerData(float &ux, float &uy, float &uz);
         int getAccelerometerAndGyroscopeData(float &ax, float &ay, float &az, float &gx, float &gy, float &gz); 
         void resetMaster();

@@ -1,0 +1,186 @@
+#include <vector>
+#include <iostream>
+#include "truckbot/EKF.h"
+
+using namespace Eigen;
+using namespace std;
+
+EKF::EKF(const double frequency, Vector3d position, Vector3d velocity, Quaterniond orientation, MatrixXd P) :
+            frequency(frequency), position(position), velocity(velocity), orientation(orientation), P(P) {
+                mag_ref << std::sin(declination_rad), std::cos(declination_rad), 0.0;
+            }
+
+EKF::~EKF() {}
+
+Quaterniond EKF::expq(const Vector3d& omega) {
+    double theta = omega.norm();
+    if (theta < 1e-6) return Quaterniond(1, 0.5 * omega(0), 0.5 * omega(1), 0.5 * omega(2));
+    Vector3d axis = omega / theta;
+    return Quaterniond(AngleAxisd(theta, axis));
+}
+
+Matrix4d EKF::leftQuatMatrix(const Quaterniond& q) {
+    Matrix4d Q;
+    Q << q.w(), -q.x(), -q.y(), -q.z(),
+         q.x(),  q.w(), -q.z(),  q.y(),
+         q.y(),  q.z(),  q.w(), -q.x(),
+         q.z(), -q.y(),  q.x(),  q.w();
+    return Q;
+}
+
+Matrix<double, 4, 3> EKF::leftQuatJacobian() {
+    Matrix<double, 4, 3> J;
+    J << 0, 0, 0,
+         1, 0, 0,
+         0, 1, 0,
+         0, 0, 1;
+    return J;
+}
+
+Matrix<double, 3, 4> EKF::dRnb_by_dq(const Quaterniond& q, const Vector3d& a_body) {
+    double eps = 1e-5;
+    Matrix<double, 3, 4> J;
+    Vector4d qv(q.w(), q.x(), q.y(), q.z());
+    for (int i = 0; i < 4; ++i) {
+        Vector4d dq = Vector4d::Zero();
+        dq(i) = eps;
+        Quaterniond q_perturbed(qv + dq);
+        q_perturbed.normalize();
+        Vector3d Ra_plus = q_perturbed.toRotationMatrix() * a_body;
+
+        dq(i) = -eps;
+        Quaterniond q_perturbed_neg(qv + dq);
+        q_perturbed_neg.normalize();
+        Vector3d Ra_minus = q_perturbed_neg.toRotationMatrix() * a_body;
+
+        J.col(i) = (Ra_plus - Ra_minus) / (2 * eps);
+    }
+    return J;
+}
+
+MatrixXd EKF::compute_Ft(const Quaterniond& q, const Vector3d& a_body, const Vector3d& omega_body, double dt) {
+    MatrixXd Ft = MatrixXd::Zero(10, 10);
+    Matrix3d I3 = Matrix3d::Identity();
+    Matrix<double, 3, 4> dR_dq = dRnb_by_dq(q, a_body);
+
+    Ft.block<3,3>(0,0) = I3;
+    Ft.block<3,3>(0,3) = dt * I3;
+    Ft.block<3,4>(0,6) = 0.5 * dt * dt * dR_dq;
+
+    Ft.block<3,3>(3,3) = I3;
+    Ft.block<3,4>(3,6) = dt * dR_dq;
+
+    Quaterniond dq = expq(0.5 * dt * omega_body);
+    Ft.block<4,4>(6,6) = leftQuatMatrix(dq);
+
+    cout << "Ft matrix:\n" << Ft << "\n\n";
+    return Ft;
+}
+
+MatrixXd EKF::compute_Gt(const Quaterniond& q, const Vector3d& omega, double dt) {
+    MatrixXd Gt = MatrixXd::Zero(10, 9);
+    Gt.block<6,6>(0,0) = Matrix<double,6,6>::Identity();
+    Matrix<double, 4, 3> Jexp = leftQuatJacobian();
+    Matrix4d Lq = leftQuatMatrix(q);
+    Gt.block<4,3>(6,6) = -0.5 * dt * Lq * Jexp;
+
+    cout << "Gt matrix:\n" << Gt << "\n\n";
+    return Gt;
+}
+
+MatrixXd EKF::compute_Q(const Matrix3d& Sigma_a, const Matrix3d& Sigma_omega) {
+    MatrixXd Q = MatrixXd::Zero(9, 9);
+    Q.block<3,3>(0,0) = Sigma_a;
+    Q.block<3,3>(3,3) = Sigma_a;
+    Q.block<3,3>(6,6) = Sigma_omega;
+    return Q;
+}
+
+MatrixXd EKF::compute_H(Vector3d gravity_n, Vector3d mag_ref) {
+    MatrixXd H = MatrixXd::Zero(6, 10);
+    Matrix<double, 3, 4> H_acc = -dRnb_by_dq(this->orientation, gravity_n);
+    Matrix<double, 3, 4> H_mag = dRnb_by_dq(this->orientation, mag_ref);
+    H.block<3,4>(0,6) = H_acc;
+    H.block<3,4>(3,6) = H_mag;
+    return H;
+}
+
+MatrixXd EKF::compute_R(const Matrix3d& Sigma_a, const Matrix3d& Sigma_m) {
+    MatrixXd R = MatrixXd::Zero(6, 6);
+    R.block<3,3>(0,0) = Sigma_a;
+    R.block<3,3>(3,3) = Sigma_m;
+    return R;
+}
+
+
+
+void EKF::predict(Vector3d& acc_data, Vector3d& gyro_data, double dt, 
+                  const Matrix3d& Sigma_a, const Matrix3d& Sigma_omega) {
+    MatrixXd Q = compute_Q(Sigma_a, Sigma_omega);
+    
+    // Time update
+    MatrixXd Ft = compute_Ft(this->orientation, acc_data, gyro_data, dt);
+    MatrixXd Gt = compute_Gt(this->orientation, gyro_data, dt);
+
+    this->position += this->velocity * dt + 0.5 * dt * dt * (this->orientation * acc_data);
+    this->velocity += dt * (this->orientation * acc_data);
+    this->orientation = this->orientation * expq(0.5 * dt * gyro_data);
+    this->orientation.normalize();
+
+    this->P = Ft * this->P * Ft.transpose() + Gt * Q * Gt.transpose();
+
+    cout << "Predicted position: " << this->position.transpose() << "\n";
+    cout << "Predicted velocity: " << this->velocity.transpose() << "\n";
+    cout << "Predicted orientation (quaternion): " << this->orientation.coeffs().transpose() << "\n";
+    cout << "Predicted covariance P:\n" << this->P << "\n\n";
+}
+
+void EKF::update(Vector3d& acc_data, Vector3d& mag_data, const Vector3d& mag_ref,
+                    double dt, const Matrix3d& Sigma_a, const Matrix3d& Sigma_m) {
+
+    Vector3d gravity_n(0, 0, -9.81);                    
+    VectorXd y(6);
+    y.head<3>() = -acc_data;
+    y.tail<3>() = mag_data;
+    
+    MatrixXd H = compute_H(gravity_n, mag_ref);
+    
+    VectorXd y_pred(6);
+    Matrix3d Rnb = this->orientation.toRotationMatrix();
+    y_pred.head<3>() = Rnb.transpose() * gravity_n;
+    y_pred.tail<3>() = Rnb * mag_ref;
+    
+    VectorXd e = y - y_pred;
+    
+    cout << "Combined measurement y: \n" << y.transpose() << "\n";
+    cout << "Prediction y_pred: \n" << y_pred.transpose() << "\n";
+    cout << "Measurement error e: \n" << e.transpose() << "\n";
+    
+    MatrixXd R = compute_R(Sigma_a, Sigma_m);
+    
+    MatrixXd S = H * this->P * H.transpose() + R;
+    MatrixXd K = this->P * H.transpose() * S.inverse();
+    
+    cout << "Kalman gain K:\n" << K << "\n";
+    
+    VectorXd dx = K * e;
+    this->position += dx.segment<3>(0);
+    this->velocity += dx.segment<3>(3);
+    Vector4d dq = dx.segment<4>(6);
+    Quaterniond dq_quat(1, 0.5 * dq(0), 0.5 * dq(1), 0.5 * dq(2));
+    this->orientation = (this->orientation * dq_quat).normalized();
+    this->P = (MatrixXd::Identity(10, 10) - K * H) * this->P;
+    
+    cout << "Updated this position: " << this->position.transpose() << "\n";
+    cout << "Updated this velocity: " << this->velocity.transpose() << "\n";
+    cout << "Updated this orientation (quaternion): " << this->orientation.coeffs().transpose() << "\n";
+    cout << "Updated covariance P:\n" << this->P << "\n\n";
+}
+
+void EKF::ekf_loop(Vector3d& acc_data, Vector3d& gyro_data, Vector3d& mag_data) {
+
+    predict(acc_data, gyro_data, dt, Sigma_a, Sigma_omega);
+    // Combined measurement update (accelerometer + magnetometer)
+    update(acc_data, mag_data, mag_ref, dt, Sigma_a, Sigma_m);
+
+}

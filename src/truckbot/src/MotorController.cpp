@@ -16,8 +16,8 @@ MotorController::MotorController(const uint8_t& chip, const uint8_t& leftOne, co
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftTwo, 1);
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightOne, 1);
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightTwo, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftOne, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftTwo, 1);
+    lgGpioClaimOutput(handle, LG_SET_PULL_DOWN, liftOne, 1);
+    lgGpioClaimOutput(handle, LG_SET_PULL_DOWN, liftTwo, 1);
 
 }
 
@@ -84,8 +84,8 @@ bool MotorController::moveActuator(const bool direction)
     int command1 = 1;
     int command2 = 0;
     if (direction) {
-        int command1 = 0;
-        int command2 = 1;
+        command1 = 0;
+        command2 = 1;
     }
     lgGpioWrite(handle, liftOne, command1);
     lgGpioWrite(handle, liftTwo, command2);

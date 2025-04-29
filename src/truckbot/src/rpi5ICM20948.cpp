@@ -1,6 +1,6 @@
 
 
-#include "truckbot/rpi5_ICM20948.h"
+#include "truckbot/rpi5ICM20948.h"
 #include <iostream>
 #include <lgpio.h>
 #include <unistd.h>
@@ -13,7 +13,7 @@
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
  
-rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
+rpi5ICM20948::rpi5ICM20948(const uint8_t device) {
     uint8_t reg;
     handle = lgI2cOpen(1, device, 0);
     if (handle < 0) {
@@ -94,7 +94,7 @@ rpi5_ICM20948::rpi5_ICM20948(const uint8_t device) {
     calibrateSensor();
 }
 
-void rpi5_ICM20948::resetMaster() {
+void rpi5ICM20948::resetMaster() {
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, PWR_MGMT_1, 0x80);
@@ -106,7 +106,7 @@ void rpi5_ICM20948::resetMaster() {
     }
 }
 
-uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) { 
+uint8_t rpi5ICM20948::readMagReg(uint8_t reg) { 
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_ADDR, 0x8C);
@@ -128,7 +128,7 @@ uint8_t rpi5_ICM20948::readMagReg(uint8_t reg) {
     return lgI2cReadByteData(handle, I2C_SLV4_DI);
 }
 
-void rpi5_ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
+void rpi5ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, I2C_SLV4_ADDR, 0x0C);
@@ -148,7 +148,7 @@ void rpi5_ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
     }
 }
 
-int rpi5_ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
+int rpi5ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
     static char data[8];
     int16_t uiUx, uiUy, uiUz;
 
@@ -166,7 +166,7 @@ int rpi5_ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
     return success;
 }
  
-int rpi5_ICM20948::getAccelerometerAndGyroscopeData(float &ax, float &ay, float &az, float &gx, float &gy, float &gz) {
+int rpi5ICM20948::getAccelerometerAndGyroscopeData(float &ax, float &ay, float &az, float &gx, float &gy, float &gz) {
     static char data[12];
     int16_t uiAx, uiAy, uiAz, uiGx, uiGy, uiGz;
     
@@ -191,7 +191,7 @@ int rpi5_ICM20948::getAccelerometerAndGyroscopeData(float &ax, float &ay, float 
     return success;
 }
 
-void rpi5_ICM20948::calibrateSensor() {
+void rpi5ICM20948::calibrateSensor() {
     Eigen::Vector3f accelSum = Eigen::Vector3f::Zero();
     Eigen::Vector3f gyroSum = Eigen::Vector3f::Zero();
     Eigen::Vector3f magMin = Eigen::Vector3f::Constant(1e9);
