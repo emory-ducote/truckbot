@@ -1,13 +1,30 @@
 #include <vector>
 #include <iostream>
+#include <fmt/format.h>
+#include <spdlog/spdlog.h>
+#include "spdlog/fmt/ostr.h"
 #include "truckbot/EKF.h"
 
 using namespace Eigen;
 using namespace std;
 
+template <typename T>
+struct fmt::formatter<T, char, std::enable_if_t<
+    std::is_base_of_v<Eigen::EigenBase<T>, T>>> {
+    
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    template <typename FormatContext>
+    auto format(const T& mat, FormatContext& ctx) {
+        std::ostringstream oss;
+        oss << mat;
+        return fmt::format_to(ctx.out(), "{}", oss.str());
+    }
+};
+
 EKF::EKF(const double frequency, Vector3d position, Vector3d velocity, Quaterniond orientation, MatrixXd P) :
             frequency(frequency), position(position), velocity(velocity), orientation(orientation), P(P) {
-                mag_ref << std::sin(declination_rad), std::cos(declination_rad), 0.0;
+        spdlog::set_level(spdlog::level::info);
             }
 
 EKF::~EKF() {}
@@ -25,6 +42,15 @@ Matrix4d EKF::leftQuatMatrix(const Quaterniond& q) {
          q.x(),  q.w(), -q.z(),  q.y(),
          q.y(),  q.z(),  q.w(), -q.x(),
          q.z(), -q.y(),  q.x(),  q.w();
+    return Q;
+}
+
+Matrix4d EKF::rightQuatMatrix(const Quaterniond& q) {
+    Matrix4d Q;
+    Q << q.w(), -q.x(), -q.y(), -q.z(),
+         q.x(),  q.w(),  q.z(), -q.y(),
+         q.y(), -q.z(),  q.w(),  q.x(),
+         q.z(),  q.y(), -q.x(),  q.w();
     return Q;
 }
 
@@ -47,12 +73,10 @@ Matrix<double, 3, 4> EKF::dRnb_by_dq(const Quaterniond& q, const Vector3d& a_bod
         Quaterniond q_perturbed(qv + dq);
         q_perturbed.normalize();
         Vector3d Ra_plus = q_perturbed.toRotationMatrix() * a_body;
-
         dq(i) = -eps;
         Quaterniond q_perturbed_neg(qv + dq);
         q_perturbed_neg.normalize();
         Vector3d Ra_minus = q_perturbed_neg.toRotationMatrix() * a_body;
-
         J.col(i) = (Ra_plus - Ra_minus) / (2 * eps);
     }
     return J;
@@ -71,9 +95,9 @@ MatrixXd EKF::compute_Ft(const Quaterniond& q, const Vector3d& a_body, const Vec
     Ft.block<3,4>(3,6) = dt * dR_dq;
 
     Quaterniond dq = expq(0.5 * dt * omega_body);
-    Ft.block<4,4>(6,6) = leftQuatMatrix(dq);
+    Ft.block<4,4>(6,6) = rightQuatMatrix(dq);
 
-    cout << "Ft matrix:\n" << Ft << "\n\n";
+    spdlog::debug("Ft matrix:\n {}\n", Ft);
     return Ft;
 }
 
@@ -84,7 +108,7 @@ MatrixXd EKF::compute_Gt(const Quaterniond& q, const Vector3d& omega, double dt)
     Matrix4d Lq = leftQuatMatrix(q);
     Gt.block<4,3>(6,6) = -0.5 * dt * Lq * Jexp;
 
-    cout << "Gt matrix:\n" << Gt << "\n\n";
+    spdlog::debug("Gt matrix:\n {}\n", Gt);
     return Gt;
 }
 
@@ -96,29 +120,23 @@ MatrixXd EKF::compute_Q(const Matrix3d& Sigma_a, const Matrix3d& Sigma_omega) {
     return Q;
 }
 
-MatrixXd EKF::compute_H(Vector3d gravity_n, Vector3d mag_ref) {
-    MatrixXd H = MatrixXd::Zero(6, 10);
+MatrixXd EKF::compute_H(Vector3d gravity_n) {
+    MatrixXd H = MatrixXd::Zero(3, 10);
     Matrix<double, 3, 4> H_acc = -dRnb_by_dq(this->orientation, gravity_n);
-    Matrix<double, 3, 4> H_mag = dRnb_by_dq(this->orientation, mag_ref);
     H.block<3,4>(0,6) = H_acc;
-    H.block<3,4>(3,6) = H_mag;
     return H;
 }
 
-MatrixXd EKF::compute_R(const Matrix3d& Sigma_a, const Matrix3d& Sigma_m) {
-    MatrixXd R = MatrixXd::Zero(6, 6);
+MatrixXd EKF::compute_R(const Matrix3d& Sigma_a) {
+    MatrixXd R = MatrixXd::Zero(3, 3);
     R.block<3,3>(0,0) = Sigma_a;
-    R.block<3,3>(3,3) = Sigma_m;
     return R;
 }
-
-
 
 void EKF::predict(Vector3d& acc_data, Vector3d& gyro_data, double dt, 
                   const Matrix3d& Sigma_a, const Matrix3d& Sigma_omega) {
     MatrixXd Q = compute_Q(Sigma_a, Sigma_omega);
     
-    // Time update
     MatrixXd Ft = compute_Ft(this->orientation, acc_data, gyro_data, dt);
     MatrixXd Gt = compute_Gt(this->orientation, gyro_data, dt);
 
@@ -129,39 +147,36 @@ void EKF::predict(Vector3d& acc_data, Vector3d& gyro_data, double dt,
 
     this->P = Ft * this->P * Ft.transpose() + Gt * Q * Gt.transpose();
 
-    cout << "Predicted position: " << this->position.transpose() << "\n";
-    cout << "Predicted velocity: " << this->velocity.transpose() << "\n";
-    cout << "Predicted orientation (quaternion): " << this->orientation.coeffs().transpose() << "\n";
-    cout << "Predicted covariance P:\n" << this->P << "\n\n";
+    spdlog::debug("Predicted position: {}\n", this->position.transpose());
+    spdlog::debug("Predicted velocity: {}\n", this->velocity.transpose());
+    spdlog::debug("Predicted orientation (quaternion): {}\n", this->orientation.coeffs().transpose());
+    spdlog::debug("Predicted covariance P: \n {}\n", this->P);
 }
 
-void EKF::update(Vector3d& acc_data, Vector3d& mag_data, const Vector3d& mag_ref,
-                    double dt, const Matrix3d& Sigma_a, const Matrix3d& Sigma_m) {
+void EKF::update(Vector3d& acc_data, double dt, const Matrix3d& Sigma_a) {
 
-    Vector3d gravity_n(0, 0, -9.81);                    
-    VectorXd y(6);
-    y.head<3>() = -acc_data;
-    y.tail<3>() = mag_data;
+    Vector3d gravity_n(0, 0, 0);                    
+    VectorXd y(3);
+    y = -acc_data;
     
-    MatrixXd H = compute_H(gravity_n, mag_ref);
-    
-    VectorXd y_pred(6);
+    MatrixXd H = compute_H(gravity_n);
+
+    VectorXd y_pred(3);
     Matrix3d Rnb = this->orientation.toRotationMatrix();
-    y_pred.head<3>() = Rnb.transpose() * gravity_n;
-    y_pred.tail<3>() = Rnb * mag_ref;
+    y_pred = Rnb.transpose() * gravity_n;
     
     VectorXd e = y - y_pred;
     
-    cout << "Combined measurement y: \n" << y.transpose() << "\n";
-    cout << "Prediction y_pred: \n" << y_pred.transpose() << "\n";
-    cout << "Measurement error e: \n" << e.transpose() << "\n";
+    spdlog::debug("Combined measurement y: {}\n", y.transpose());
+    spdlog::debug("Prediction y_pred: {}\n", y_pred.transpose());
+    spdlog::debug("Measurement error e: {}\n", e.transpose());
     
-    MatrixXd R = compute_R(Sigma_a, Sigma_m);
+    MatrixXd R = compute_R(Sigma_a);
     
     MatrixXd S = H * this->P * H.transpose() + R;
     MatrixXd K = this->P * H.transpose() * S.inverse();
     
-    cout << "Kalman gain K:\n" << K << "\n";
+    spdlog::debug("Kalman gain K:\n {}\n", K);
     
     VectorXd dx = K * e;
     this->position += dx.segment<3>(0);
@@ -170,17 +185,38 @@ void EKF::update(Vector3d& acc_data, Vector3d& mag_data, const Vector3d& mag_ref
     Quaterniond dq_quat(1, 0.5 * dq(0), 0.5 * dq(1), 0.5 * dq(2));
     this->orientation = (this->orientation * dq_quat).normalized();
     this->P = (MatrixXd::Identity(10, 10) - K * H) * this->P;
+
+    // Quaternion norm and squared norm
+    Vector4d q_vec = dq_quat.coeffs();
+    double norm_q = q_vec.norm();
+    double norm_q_sq = norm_q * norm_q;
+
+    // Identity matrix
+    Matrix4d I = Matrix4d::Identity();
+
+    // Outer product: q̃ * q̃ᵀ
+    Matrix4d outer = q_vec * q_vec.transpose();
+
+    // Compute Jacobian Jt
+    Matrix4d P_quat_tilde = this->P.block<4, 4>(6, 6);
+
+    Matrix4d Jt = (1.0 / norm_q) * (I - outer / norm_q_sq);
+
+    // Renormalize quaternion covariance
+    Matrix4d P_quat = Jt * P_quat_tilde * Jt.transpose();
+
+    // Store updated quaternion covariance back into P
+    this->P.block<4, 4>(6, 6) = P_quat;
     
-    cout << "Updated this position: " << this->position.transpose() << "\n";
-    cout << "Updated this velocity: " << this->velocity.transpose() << "\n";
-    cout << "Updated this orientation (quaternion): " << this->orientation.coeffs().transpose() << "\n";
-    cout << "Updated covariance P:\n" << this->P << "\n\n";
+    spdlog::debug("Updated this position: {}\n", this->position.transpose());
+    spdlog::debug("Updated this velocity: {}\n", this->velocity.transpose());
+    spdlog::debug("Updated this orientation (quaternion): {}\n", this->orientation.coeffs().transpose());
+    spdlog::debug("Updated covariance P:\n {}\n", this->P);
 }
 
-void EKF::ekf_loop(Vector3d& acc_data, Vector3d& gyro_data, Vector3d& mag_data) {
+void EKF::ekf_loop(Vector3d& acc_data, Vector3d& gyro_data) {
 
     predict(acc_data, gyro_data, dt, Sigma_a, Sigma_omega);
-    // Combined measurement update (accelerometer + magnetometer)
-    update(acc_data, mag_data, mag_ref, dt, Sigma_a, Sigma_m);
+    update(acc_data, dt, Sigma_a);
 
 }

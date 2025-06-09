@@ -16,6 +16,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
+find_package(fmt REQUIRED)
 
 
 INCLUDE_DIRECTORIES(
@@ -39,7 +40,7 @@ add_executable(ekf
 
 target_link_libraries(motor_controller lgpio)
 target_link_libraries(imu lgpio)
-target_link_libraries(ekf Eigen3::Eigen)
+target_link_libraries(ekf Eigen3::Eigen fmt::fmt)
 ament_target_dependencies(motor_controller rclcpp std_msgs sensor_msgs)
 ament_target_dependencies(imu rclcpp sensor_msgs)
 ament_target_dependencies(ekf rclcpp sensor_msgs nav_msgs)

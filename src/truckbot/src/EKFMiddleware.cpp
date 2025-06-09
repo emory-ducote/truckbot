@@ -3,6 +3,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include <sensor_msgs/msg/joy.hpp>
 
 
 class ImuListener : public rclcpp::Node {
@@ -11,18 +12,26 @@ class ImuListener : public rclcpp::Node {
       {
             imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
               "/imu", 10, std::bind(&ImuListener::imuCallback, this, std::placeholders::_1));
+            joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
+              "/joy", 10, std::bind(&ImuListener::joyCallback, this, std::placeholders::_1));
             publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-
+            
       }
 
     private:
         void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) 
         {
             RCLCPP_INFO(this->get_logger(), "Received imu data");
-            Vector3d accel_data(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
+            Vector3d accel_data(msg->linear_acceleration.x, msg->linear_acceleration.y,0);
             Vector3d gyro_data(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
-            Vector3d mag_data(msg->orientation.x, msg->orientation.y, msg->orientation.z);
-            state->ekf_loop(accel_data, gyro_data, mag_data);
+            if ((leftStick == 0.0) && (rightStick == 0.0)) 
+            {
+              accel_data << 0, 0, 0;
+              gyro_data << 0, 0, 0;
+              state->velocity << 0, 0, 0;
+            }
+            
+            state->ekf_loop(accel_data, gyro_data);
             auto message = nav_msgs::msg::Odometry();
             message.pose.pose.position.x = state->position.x();
             message.pose.pose.position.y = state->position.y();
@@ -36,11 +45,20 @@ class ImuListener : public rclcpp::Node {
             message.pose.pose.orientation.w = state->orientation.w();
             message.header.frame_id = "base_link";
             publisher_->publish(message);
+            
+        }
+        void joyCallback(const sensor_msgs::msg::Joy::SharedPtr msg) 
+        {
+            leftStick = msg->axes[1];  // Typically left stick horizontal
+            rightStick = msg->axes[4];  // Typically left stick vertical
         }
 
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
-        std::shared_ptr<EKF> state;
+        rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_;
+        std::shared_ptr<EKF> state;
+        float leftStick = 0;
+        float rightStick = 0;
 };
 
 int main(int argc, char** argv) {
