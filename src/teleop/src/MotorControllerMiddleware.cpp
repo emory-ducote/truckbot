@@ -5,7 +5,7 @@
 #include <lgpio.h>
 #include <iostream>
 #include <sensor_msgs/msg/joy.hpp>
-#include "truckbot/MotorController.h"
+#include "MotorController.h"
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"

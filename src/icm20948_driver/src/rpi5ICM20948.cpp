@@ -1,6 +1,4 @@
-
-
-#include "truckbot/rpi5ICM20948.h"
+#include "rpi5ICM20948.h"
 #include <iostream>
 #include <lgpio.h>
 #include <unistd.h>

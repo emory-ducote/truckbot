@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <unistd.h>
-#include "truckbot/MotorController.h"
+#include "MotorController.h"
 
 MotorController::MotorController(const uint8_t& chip, const uint8_t& leftOne, const uint8_t& leftTwo, const uint8_t& rightOne, const uint8_t& rightTwo, const uint8_t& liftOne, const uint8_t& liftTwo)
     : chip(chip), leftOne(leftOne), leftTwo(leftTwo), rightOne(rightOne), rightTwo(rightTwo), liftOne(liftOne), liftTwo(liftTwo)

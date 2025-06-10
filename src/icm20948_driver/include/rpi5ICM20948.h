@@ -5,7 +5,6 @@
 #include <cmath>
 #include <eigen3/Eigen/Dense>
 
-
 // ICM20948 Registers
 // Bank 0 register map
 #define WHO_AM_I               0x00
