@@ -3,7 +3,7 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include "spdlog/fmt/ostr.h"
-#include "truckbot/EKF.h"
+#include "EKF.h"
 
 using namespace Eigen;
 using namespace std;

@@ -1,10 +1,9 @@
-#ifndef RPI55ICM20948_H
+#ifndef RPI5ICM20948_H
 #define RPI5ICM20948_H
 
 #include <cstdint>
 #include <cmath>
 #include <eigen3/Eigen/Dense>
-
 
 // ICM20948 Registers
 // Bank 0 register map

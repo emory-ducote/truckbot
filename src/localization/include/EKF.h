@@ -42,7 +42,10 @@ class EKF {
         const double frequency;
         const double dt = 1.0f / frequency;
         const Matrix3d Sigma_omega = 0.1f * Matrix3d::Identity();
-        const Matrix3d Sigma_a     = 0.5 * Matrix3d::Identity();
+        const Matrix3d Sigma_a = (Matrix3d() << 
+            0.5, 0.0, 0.0,
+            0.0, 1.0, 0.0,   // y-axis has higher noise
+            0.0, 0.0, 0.5).finished();
 };  
 
 
