@@ -14,21 +14,23 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(fmt REQUIRED)
 
 
-INCLUDE_DIRECTORIES(
+include_directories(
   include
 )
   
 add_executable(ekf
   src/EKFMiddleware.cpp
   src/EKF.cpp
+  src/LowPassFilter.cpp
 )
 
 target_link_libraries(ekf Eigen3::Eigen fmt::fmt)
-ament_target_dependencies(ekf rclcpp sensor_msgs nav_msgs)
+ament_target_dependencies(ekf rclcpp sensor_msgs std_msgs nav_msgs)
 
 
 install(TARGETS

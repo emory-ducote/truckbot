@@ -1,4 +1,4 @@
-#ifndef RPI55ICM20948_H
+#ifndef RPI5ICM20948_H
 #define RPI5ICM20948_H
 
 #include <cstdint>

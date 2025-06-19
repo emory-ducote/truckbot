@@ -4,7 +4,8 @@
 #include "sensor_msgs/msg/imu.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include <sensor_msgs/msg/joy.hpp>
-
+#include "std_msgs/msg/float32.hpp"
+#include "LowPassFilter.h"
 
 class ImuListener : public rclcpp::Node {
   public:
@@ -15,14 +16,18 @@ class ImuListener : public rclcpp::Node {
             joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
               "/joy", 10, std::bind(&ImuListener::joyCallback, this, std::placeholders::_1));
             publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-            
+            float_test = this->create_publisher<std_msgs::msg::Float32>("float_test", 10);
       }
 
     private:
         void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) 
-        {
-            RCLCPP_INFO(this->get_logger(), "Received imu data");
-            Vector3d accel_data(msg->linear_acceleration.x, msg->linear_acceleration.y,0);
+        {            
+            double filtered_ax = accel_x_filter.filter(msg->linear_acceleration.x);
+            double filtered_ay = accel_y_filter.filter(msg->linear_acceleration.y);
+            auto float_message = std_msgs::msg::Float32();
+            float_message.data = filtered_ax;
+            float_test->publish(float_message);
+            Vector3d accel_data(filtered_ax, filtered_ay, 0);
             Vector3d gyro_data(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
             if ((leftStick == 0.0) && (rightStick == 0.0)) 
             {
@@ -56,7 +61,10 @@ class ImuListener : public rclcpp::Node {
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
         rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_;
+        rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr float_test;
         std::shared_ptr<EKF> state;
+        LowPassFilter accel_x_filter{0.01}; // very restrictive low-pass
+        LowPassFilter accel_y_filter{0.01};
         float leftStick = 0;
         float rightStick = 0;
 };

@@ -37,9 +37,8 @@ class JoyListener : public rclcpp::Node {
       std::shared_ptr<MotorController> motorController;
   };
 
+
 int main(int argc, char** argv) {
-
-
   const uint8_t chip = 4;
   const uint8_t leftOne = 23;
   const uint8_t leftTwo = 24;
@@ -47,8 +46,6 @@ int main(int argc, char** argv) {
   const uint8_t rightTwo = 27;
   const uint8_t liftOne = 6;
   const uint8_t liftTwo = 13;
-
-
   rclcpp::init(argc, argv);
   auto controller = std::make_shared<MotorController>(chip, leftOne, leftTwo, rightOne, rightTwo, liftOne, liftTwo);
   rclcpp::spin(std::make_shared<JoyListener>(controller));
