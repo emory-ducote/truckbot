@@ -40,14 +40,28 @@ class JoyListener : public rclcpp::Node {
 
 int main(int argc, char** argv) {
   const uint8_t chip = 4;
-  const uint8_t leftOne = 23;
-  const uint8_t leftTwo = 24;
-  const uint8_t rightOne = 17;
-  const uint8_t rightTwo = 27;
-  const uint8_t liftOne = 6;
-  const uint8_t liftTwo = 13;
+  const uint8_t rightFrontOne = 13;
+  const uint8_t rightFrontTwo = 6;
+  const uint8_t rightRearOne = 22;
+  const uint8_t rightRearTwo = 10;
+  const uint8_t leftFrontOne = 26;
+  const uint8_t leftFrontTwo = 19;
+  const uint8_t leftRearOne = 17;
+  const uint8_t leftRearTwo = 27;
+  const uint8_t liftOne = 9;
+  const uint8_t liftTwo = 11;
   rclcpp::init(argc, argv);
-  auto controller = std::make_shared<MotorController>(chip, leftOne, leftTwo, rightOne, rightTwo, liftOne, liftTwo);
+  auto controller = std::make_shared<MotorController>(chip, 
+                                                      leftFrontOne, 
+                                                      leftFrontTwo, 
+                                                      leftRearOne, 
+                                                      leftRearTwo,
+                                                      rightFrontOne, 
+                                                      rightFrontTwo,
+                                                      rightRearOne, 
+                                                      rightRearTwo, 
+                                                      liftOne, 
+                                                      liftTwo);
   rclcpp::spin(std::make_shared<JoyListener>(controller));
   rclcpp::shutdown();
   return 0;
