@@ -17,7 +17,7 @@ class MotorController {
                         const uint8_t& liftOne,
                         const uint8_t& liftTwo);
         ~MotorController();
-        bool setMotorSpeed(const float left, const float right);
+        bool applySpeedCommand(double linearX, double angularZ);
         bool moveActuator(const bool direction);
         
     private:
@@ -33,8 +33,9 @@ class MotorController {
         const uint8_t liftOne;
         const uint8_t liftTwo;
         int handle;
-
-        float speedToPWM(const float speed);
+        
+        bool setMotorSpeed(const double left, const double right);
+        double speedToPWM(const double speed);
 };
 
 #endif
