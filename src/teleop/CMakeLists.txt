@@ -14,6 +14,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 INCLUDE_DIRECTORIES(
   include
@@ -27,9 +28,19 @@ add_executable(motor_controller
 target_link_libraries(motor_controller lgpio)
 ament_target_dependencies(motor_controller rclcpp std_msgs sensor_msgs)
 
+add_executable(teleop
+  src/TeleOp.cpp
+)
+
+ament_target_dependencies(teleop
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+)
 
 install(TARGETS
   motor_controller
+  teleop
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
