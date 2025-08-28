@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cmath>
 #include "EncoderDriver.h"
 
 void encoderCallback(int e, lgGpioAlert_p evt, void *data)
@@ -52,7 +53,11 @@ void EncoderDriver::handleEdgeChange()
     lastEncoded = encoded;
 }
 
-double EncoderDriver::getRotations()
+float EncoderDriver::getWheelSpeeds(float dt)
 {
-    return static_cast<double>(encoderCount) / CPR_output;
+    float deltaCount = static_cast<float>(encoderCount - lastEncoderCount) / CPR_output;
+    float omega  = (deltaCount  * 2.0 * M_PI) / dt; // rad/s
+    float vel    = omega  * 0.03; // m/s
+    lastEncoderCount = encoderCount;
+    return vel;
 }

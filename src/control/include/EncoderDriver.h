@@ -14,13 +14,14 @@ class EncoderDriver {
                         const uint8_t& pinB);
         ~EncoderDriver();
         void handleEdgeChange();
-        double getRotations();  
+        float getWheelSpeeds(float dt);  
         
     private:
         const uint8_t chip;
         const uint8_t pinA;
         const uint8_t pinB;
         long encoderCount;
+        long lastEncoderCount;
         int lastEncoded;
         int handle;     
         const int CPR_output = 700 * 4;   // gearbox shaft resolution in X4 mode

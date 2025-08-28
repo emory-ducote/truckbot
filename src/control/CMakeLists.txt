@@ -46,6 +46,8 @@ add_executable(encoder_driver
 target_link_libraries(encoder_driver lgpio)
 ament_target_dependencies(encoder_driver
   rclcpp
+  std_msgs
+  geometry_msgs
 )
 
 install(TARGETS

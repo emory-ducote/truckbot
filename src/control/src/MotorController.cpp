@@ -60,8 +60,8 @@ bool MotorController::applySpeedCommand(double linearX, double angularZ)
     double rightVel = linearX + (0.2 / 2) * angularZ;
     leftVel = leftVel / 0.03;
     rightVel = rightVel / 0.03;
-    leftVel = leftVel * (60 / M_PI * 2);
-    rightVel = rightVel * (60 / M_PI * 2);
+    leftVel = leftVel * (60 / (M_PI * 2));
+    rightVel = rightVel * (60 / (M_PI * 2));
     double scaleFactor = std::min(1.0, 251 / std::max(std::abs(leftVel), std::abs(rightVel)));
     leftVel = (leftVel * scaleFactor) / 251;
     rightVel = (rightVel * scaleFactor) / 251;

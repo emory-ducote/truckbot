@@ -1,6 +1,7 @@
 #include "EncoderDriver.h"
 #include "rclcpp/rclcpp.hpp"
 #include <chrono>
+#include "geometry_msgs/msg/twist.hpp"
 
 using namespace std::chrono_literals;
 
@@ -18,27 +19,37 @@ class EncoderDriverMiddleware : public rclcpp::Node {
                               leftRear(leftRear)
       {
         timer_ = this->create_wall_timer(
-                10ms, std::bind(&EncoderDriverMiddleware::timer_callback, this));
+                100ms, std::bind(&EncoderDriverMiddleware::timer_callback, this));
+        odom_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/odom", 10);
+
       }
     private:
         void timer_callback()
         {
-          double rightFrontRotations = rightFront->getRotations();
-          double rightRearRotations = rightRear->getRotations();
-          double leftFrontRotations = leftFront->getRotations();
-          double leftRearRotations = leftRear->getRotations();
-          RCLCPP_INFO(this->get_logger(), "READINGS");
-          RCLCPP_INFO(this->get_logger(), "right front: %f", rightFrontRotations);
-          RCLCPP_INFO(this->get_logger(), "right rear: %f", rightRearRotations);
-          RCLCPP_INFO(this->get_logger(), "left front: %f", leftFrontRotations);
-          RCLCPP_INFO(this->get_logger(), "left rear: %f", leftRearRotations);
+          auto rightFrontWheelSpeed = rightFront->getWheelSpeeds(0.10);
+          auto rightRearWheelSpeed = rightRear->getWheelSpeeds(0.10);
+          auto leftFrontWheelSpeed = leftFront->getWheelSpeeds(0.10);
+          auto leftRearWheelSpeed = leftRear->getWheelSpeeds(0.10);
+
+          auto rightWheelSpeed = (rightFrontWheelSpeed + rightRearWheelSpeed) / 2;
+          auto leftWheelSpeed = (leftFrontWheelSpeed + leftRearWheelSpeed) / 2;
+
+          RCLCPP_INFO(this->get_logger(), "LEFT WHEEL: %f, RIGHT WHEEL %f", leftWheelSpeed, rightWheelSpeed);
+
+
+          auto message = geometry_msgs::msg::Twist();
+          message.linear.x = (rightWheelSpeed + leftWheelSpeed) / 2;
+          message.angular.z = (rightWheelSpeed - leftWheelSpeed) / 0.2;
+
+          odom_publisher_->publish(message);
+          
         }
 
         std::shared_ptr<EncoderDriver> rightFront;
         std::shared_ptr<EncoderDriver> rightRear;
         std::shared_ptr<EncoderDriver> leftFront;
         std::shared_ptr<EncoderDriver> leftRear;
-
+        rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr odom_publisher_;
         rclcpp::TimerBase::SharedPtr timer_;
 };
 
