@@ -29,6 +29,57 @@ EKF::EKF(const double frequency, Vector3d position, Vector3d velocity, Quaternio
 
 EKF::~EKF() {}
 
+MatrixXd EKF::generate_Gt(const Vector3d& u_t_1, const float& v_t, const float& w_t, const double& dt) {
+    Matrix3d Gt = Matrix3d::Identity();
+    double prev_theta = u_t_1[2];
+    Gt(2, 0) = ((-v_t / w_t) * cos(prev_theta)) + ((v_t / w_t) * cos(prev_theta + w_t * dt));
+    Gt(2, 1) = ((-v_t / w_t) * cos(prev_theta)) + ((v_t / w_t) * cos(prev_theta + w_t * dt));
+
+    spdlog::debug("Gt matrix:\n {}\n", Gt);
+    return Gt;
+}
+
+MatrixXd EKF::generate_Vt(const Vector3d& u_t_1, const float& v_t, const float& w_t, const double& dt) {
+    MatrixXd Vt = MatrixXd::Zero(2, 3);
+    double prev_theta = u_t_1[2];
+
+    Vt(0, 0) = (-sin(prev_theta) + sin(prev_theta + w_t * dt)) / w_t;
+    Vt(1, 0) = (( v_t * (sin(prev_theta) - sin(prev_theta + w_t * dt))) / w_t^2) + 
+               (( v_t * cos(prev_theta + w_t * dt) * dt) / w_t);
+    Vt(0, 1) = (cos(prev_theta) - cos(prev_theta + w_t * dt)) / w_t;
+    Vt(1, 1) = (( - v_t * (cos(prev_theta) - cos(prev_theta + w_t * dt))) / w_t^2) + 
+               (( v_t * sin(prev_theta + w_t * dt) * dt) / w_t);
+    Vt(0, 2) = 0;
+    Vt(2, 2) = dt;
+
+    spdlog::debug("Vt matrix:\n {}\n", Vt);
+    return Vt;
+}
+
+MatrixXd EKF::generate_Mt(const float& v_t, const float& w_t) {
+    MatrixXd Mt = MatrixXd::Zero(2, 2);
+    Gt(0, 0) = (alpha_1 * (v_t^2)) + (alpha_2 * (w_t^2));
+    Gt(1, 1) = (alpha_3 * (v_t^2)) + (alpha_4 * (w_t^2));
+
+    spdlog::debug("Mt matrix:\n {}\n", Mt);
+    return Mt;
+}
+
+void EKF::predict(const Vector3d& u_t_1, const float& v_t, const float& w_t, const double& dt) {
+    double prev_theta = u_t_1[2];
+    Vector3d position_prediction(((-v_t / w_t) * sin(prev_theta)) + ((v_t / w_t) * sin(prev_theta + w_t * dt)), 
+                                 ((v_t / w_t) * cos(prev_theta)) - ((v_t / w_t) * cos(prev_theta + w_t * dt)),
+                                  w_t * dt); 
+    this->x = x + position_prediction;
+    this->P = Gt * this->P * Gt.transpose() + Vt * Mt * Vt.transpose(); 
+
+
+}
+
+
+
+
+
 Quaterniond EKF::expq(const Vector3d& omega) {
     double theta = omega.norm();
     if (theta < 1e-6) return Quaterniond(1, 0.5 * omega(0), 0.5 * omega(1), 0.5 * omega(2));
