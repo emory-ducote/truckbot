@@ -2,7 +2,7 @@
 #include <cmath>
 #include "EncoderDriver.h"
 
-void encoderCallback(int e, lgGpioAlert_p evt, void *data)
+void encoderCallback(int /*e*/, lgGpioAlert_p /*evt*/, void *data)
 {
    EncoderDriver * encoder_driver = static_cast<EncoderDriver*>(data);
    encoder_driver->handleEdgeChange();
@@ -10,10 +10,16 @@ void encoderCallback(int e, lgGpioAlert_p evt, void *data)
 
 EncoderDriver::EncoderDriver(const uint8_t& chip, 
                              const uint8_t& pinA,
-                             const uint8_t& pinB)
+                             const uint8_t& pinB,
+                             const double& wheelRadius,
+                             const int& encoderCPR,
+                             const int& encoderMultiplier)
     : chip(chip), 
       pinA(pinA), 
       pinB(pinB),
+      wheelRadius(wheelRadius),
+      encoderCPR(encoderCPR),
+      encoderMultiplier(encoderMultiplier),
       encoderCount(0),
       lastEncoded(0)
     { 
@@ -55,9 +61,9 @@ void EncoderDriver::handleEdgeChange()
 
 float EncoderDriver::getWheelSpeeds(float dt)
 {
-    float deltaCount = static_cast<float>(encoderCount - lastEncoderCount) / CPR_output;
+    float deltaCount = static_cast<float>(encoderCount - lastEncoderCount) / (encoderCPR * encoderMultiplier);
     float omega  = (deltaCount  * 2.0 * M_PI) / dt; // rad/s
-    float vel    = omega  * 0.03; // m/s
+    float vel    = omega  * wheelRadius; // m/s
     lastEncoderCount = encoderCount;
     return vel;
 }

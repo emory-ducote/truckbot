@@ -15,7 +15,10 @@ MotorController::MotorController(const uint8_t& chip,
                                  const uint8_t& rightRearOne,
                                  const uint8_t& rightRearTwo,
                                  const uint8_t& liftOne,
-                                 const uint8_t& liftTwo)
+                                 const uint8_t& liftTwo,
+                                 const double& vehicleWidth,
+                                 const double& wheelRadius, 
+                                 const int& maxWheelMotorRpm)
     : chip(chip), 
       leftFrontOne(leftFrontOne), 
       leftFrontTwo(leftFrontTwo), 
@@ -26,8 +29,10 @@ MotorController::MotorController(const uint8_t& chip,
       rightRearOne(rightRearOne),
       rightRearTwo(rightRearTwo),
       liftOne(liftOne),
-      liftTwo(liftTwo)
-
+      liftTwo(liftTwo),
+      vehicleWidth(vehicleWidth),
+      wheelRadius(wheelRadius),
+      maxWheelMotorRpm(maxWheelMotorRpm)
 { 
     handle = lgGpiochipOpen(chip);
     if (handle < 0) {
@@ -58,13 +63,13 @@ bool MotorController::applySpeedCommand(double linearX, double angularZ)
 {
     double leftVel = linearX - (0.2 / 2) * angularZ;
     double rightVel = linearX + (0.2 / 2) * angularZ;
-    leftVel = leftVel / 0.03;
-    rightVel = rightVel / 0.03;
+    leftVel = leftVel / wheelRadius;
+    rightVel = rightVel / wheelRadius;
     leftVel = leftVel * (60 / (M_PI * 2));
     rightVel = rightVel * (60 / (M_PI * 2));
-    double scaleFactor = std::min(1.0, 251 / std::max(std::abs(leftVel), std::abs(rightVel)));
-    leftVel = (leftVel * scaleFactor) / 251;
-    rightVel = (rightVel * scaleFactor) / 251;
+    double scaleFactor = std::min(1.0, maxWheelMotorRpm / std::max(std::abs(leftVel), std::abs(rightVel)));
+    leftVel = (leftVel * scaleFactor) / maxWheelMotorRpm;
+    rightVel = (rightVel * scaleFactor) / maxWheelMotorRpm;
     this->setMotorSpeed(leftVel, rightVel);
     return true;
 

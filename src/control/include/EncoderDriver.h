@@ -10,8 +10,11 @@
 class EncoderDriver {
     public:
         EncoderDriver(const uint8_t& chip, 
-                        const uint8_t& pinA,
-                        const uint8_t& pinB);
+                      const uint8_t& pinA,
+                      const uint8_t& pinB,
+                      const double& wheelRadius,
+                      const int& encoderCPR,
+                      const int& encoderMultiplier);
         ~EncoderDriver();
         void handleEdgeChange();
         float getWheelSpeeds(float dt);  
@@ -20,11 +23,13 @@ class EncoderDriver {
         const uint8_t chip;
         const uint8_t pinA;
         const uint8_t pinB;
+        const int encoderCPR;
+        const int encoderMultiplier;
+        const double wheelRadius;
         long encoderCount;
         long lastEncoderCount;
         int lastEncoded;
         int handle;     
-        const int CPR_output = 700 * 4;   // gearbox shaft resolution in X4 mode
 };
 
 #endif

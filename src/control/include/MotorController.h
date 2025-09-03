@@ -15,7 +15,10 @@ class MotorController {
                         const uint8_t& rightRearOne,
                         const uint8_t& rightRearTwo,
                         const uint8_t& liftOne,
-                        const uint8_t& liftTwo);
+                        const uint8_t& liftTwo,
+                        const double& vehicleWidth,
+                        const double& wheelRadius, 
+                        const int& maxWheelMotorRpm);
         ~MotorController();
         bool applySpeedCommand(double linearX, double angularZ);
         bool moveActuator(const bool direction);
@@ -33,6 +36,9 @@ class MotorController {
         const uint8_t liftOne;
         const uint8_t liftTwo;
         int handle;
+        const double vehicleWidth;
+        const double wheelRadius;
+        const int maxWheelMotorRpm;
         
         bool setMotorSpeed(const double left, const double right);
         double speedToPWM(const double speed);
