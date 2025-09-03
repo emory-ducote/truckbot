@@ -1,0 +1,17 @@
+encoder_driver:
+  ros__parameters:
+    wheel_radius: 0.03 # meters
+    encoder_cpr: 700
+    encoder_multiplier: 4 # gearbox shaft resolution in X4 mode
+    encoder_odometry_topic: "/odom"
+
+    # pin assignments
+    chip: 4
+    right_front_a: 15
+    right_front_b: 14
+    right_rear_a: 1
+    right_rear_b: 7
+    left_front_a: 23
+    left_front_b: 24
+    left_rear_a: 25
+    left_rear_b: 8
