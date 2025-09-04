@@ -1,0 +1,20 @@
+motor_controller:
+  ros__parameters:
+    vehicle_width: 0.2 # meters
+    wheel_radius: 0.03 # meters
+    max_wheel_motor_rpm: 251
+    wheel_control_topic: "/cmd_vel"
+    actuator_control_topic: "/cmd_actuator"
+
+    # wheel pins
+    chip: 4
+    right_front_one: 13
+    right_front_two: 6
+    right_rear_one: 22
+    right_rear_two: 10
+    left_front_one: 26
+    left_front_two: 19
+    left_rear_one: 17
+    left_rear_two: 27
+    lift_one: 9
+    lift_two: 11
