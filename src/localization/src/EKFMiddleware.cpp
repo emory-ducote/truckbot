@@ -15,7 +15,9 @@ class ImuListener : public rclcpp::Node {
               "/imu", 10, std::bind(&ImuListener::imuCallback, this, std::placeholders::_1));
             joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
               "/joy", 10, std::bind(&ImuListener::joyCallback, this, std::placeholders::_1));
-            publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+            odom_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+              "/odom", 10, std::bind(&ImuListener::odomCallback, this, std::placeholders::_1));
+            publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("/local_odom", 10);
             float_test = this->create_publisher<std_msgs::msg::Float32>("float_test", 10);
       }
 
@@ -29,28 +31,45 @@ class ImuListener : public rclcpp::Node {
             float_test->publish(float_message);
             Vector3d accel_data(filtered_ax, filtered_ay, 0);
             Vector3d gyro_data(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
-            if ((leftStick == 0.0) && (rightStick == 0.0)) 
-            {
-              accel_data << 0, 0, 0;
-              gyro_data << 0, 0, 0;
-              state->velocity << 0, 0, 0;
-            }
+            // if ((leftStick == 0.0) && (rightStick == 0.0)) 
+            // {
+            //   accel_data << 0, 0, 0;
+            //   gyro_data << 0, 0, 0;
+            //   state->velocity << 0, 0, 0;
+            // }
             
-            state->ekf_loop(accel_data, gyro_data);
+            // state->ekf_loop(accel_data, gyro_data);
             auto message = nav_msgs::msg::Odometry();
-            message.pose.pose.position.x = state->position.x();
-            message.pose.pose.position.y = state->position.y();
-            message.pose.pose.position.z = state->position.z();
-            message.twist.twist.linear.x = state->velocity.x();
-            message.twist.twist.linear.y = state->velocity.y();
-            message.twist.twist.linear.z = state->velocity.z();
-            message.pose.pose.orientation.x = state->orientation.x();
-            message.pose.pose.orientation.y = state->orientation.y();
-            message.pose.pose.orientation.z = state->orientation.z();
-            message.pose.pose.orientation.w = state->orientation.w();
+            message.pose.pose.position.x = state->x.x();
+            message.pose.pose.position.y = state->x.y();
+            // message.pose.pose.orientation.x = state->orientation.x();
+            // message.pose.pose.orientation.y = state->orientation.y();
+            // message.pose.pose.orientation.z = state->orientation.z();
+            // message.pose.pose.orientation.w = state->orientation.w();
             message.header.frame_id = "base_link";
             publisher_->publish(message);
             
+        }
+        void odomCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
+        {
+          double v_t = msg->linear.x;
+          double w_t = msg->angular.z;
+
+          RCLCPP_INFO(this->get_logger(), "V_t %f, W_t %f, X %f", v_t, w_t, state->x[0]);
+
+
+          state->ekf_loop(state->x, v_t, w_t);
+
+          auto message = nav_msgs::msg::Odometry();
+            message.pose.pose.position.x = state->x.x();
+            message.pose.pose.position.y = state->x.y();
+            // message.pose.pose.orientation.x = state->orientation.x();
+            // message.pose.pose.orientation.y = state->orientation.y();
+            // message.pose.pose.orientation.z = state->orientation.z();
+            // message.pose.pose.orientation.w = state->orientation.w();
+            message.header.frame_id = "base_link";
+            publisher_->publish(message);
+
         }
         void joyCallback(const sensor_msgs::msg::Joy::SharedPtr msg) 
         {
@@ -59,6 +78,7 @@ class ImuListener : public rclcpp::Node {
         }
 
         rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
+        rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr odom_sub_;
         rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_;
         rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr float_test;
