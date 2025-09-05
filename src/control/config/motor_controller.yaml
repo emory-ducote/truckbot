@@ -1,7 +1,7 @@
 motor_controller:
   ros__parameters:
     vehicle_width: 0.2 # meters
-    wheel_radius: 0.03 # meters
+    wheel_radius: 0.05 # meters
     max_wheel_motor_rpm: 251
     wheel_control_topic: "/cmd_vel"
     actuator_control_topic: "/cmd_actuator"

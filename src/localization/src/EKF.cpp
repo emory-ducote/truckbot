@@ -24,7 +24,7 @@ struct fmt::formatter<T, char, std::enable_if_t<
 
 EKF::EKF(const double frequency, Vector3d x, MatrixXd P) :
             frequency(frequency), x(x), P(P) {
-        spdlog::set_level(spdlog::level::debug);
+        spdlog::set_level(spdlog::level::info);
             }
 
 EKF::~EKF() {}
@@ -83,70 +83,6 @@ void EKF::predict(const Vector3d& u_t_1, const float& v_t, const float& w_t, con
 
 }
 
-
-
-
-// void EKF::update(Vector3d& acc_data, double dt, const Matrix3d& Sigma_a) {
-
-//     Vector3d gravity_n(0, 0, 0);                    
-//     VectorXd y(3);
-//     y = -acc_data;
-    
-//     MatrixXd H = compute_H(gravity_n);
-
-//     VectorXd y_pred(3);
-//     Matrix3d Rnb = this->orientation.toRotationMatrix();
-//     y_pred = Rnb.transpose() * gravity_n;
-    
-//     VectorXd e = y - y_pred;
-    
-//     spdlog::debug("Combined measurement y: {}\n", y.transpose());
-//     spdlog::debug("Prediction y_pred: {}\n", y_pred.transpose());
-//     spdlog::debug("Measurement error e: {}\n", e.transpose());
-    
-//     MatrixXd R = compute_R(Sigma_a);
-    
-//     MatrixXd S = H * this->P * H.transpose() + R;
-//     MatrixXd K = this->P * H.transpose() * S.inverse();
-    
-//     spdlog::debug("Kalman gain K:\n {}\n", K);
-    
-//     VectorXd dx = K * e;
-//     this->position += dx.segment<3>(0);
-//     this->velocity += dx.segment<3>(3);
-//     Vector4d dq = dx.segment<4>(6);
-//     Quaterniond dq_quat(1, 0.5 * dq(0), 0.5 * dq(1), 0.5 * dq(2));
-//     this->orientation = (this->orientation * dq_quat).normalized();
-//     this->P = (MatrixXd::Identity(10, 10) - K * H) * this->P;
-
-//     // Quaternion norm and squared norm
-//     Vector4d q_vec = dq_quat.coeffs();
-//     double norm_q = q_vec.norm();
-//     double norm_q_sq = norm_q * norm_q;
-
-//     // Identity matrix
-//     Matrix4d I = Matrix4d::Identity();
-
-//     // Outer product: q̃ * q̃ᵀ
-//     Matrix4d outer = q_vec * q_vec.transpose();
-
-//     // Compute Jacobian Jt
-//     Matrix4d P_quat_tilde = this->P.block<4, 4>(6, 6);
-
-//     Matrix4d Jt = (1.0 / norm_q) * (I - outer / norm_q_sq);
-
-//     // Renormalize quaternion covariance
-//     Matrix4d P_quat = Jt * P_quat_tilde * Jt.transpose();
-
-//     // Store updated quaternion covariance back into P
-//     this->P.block<4, 4>(6, 6) = P_quat;
-    
-//     spdlog::debug("Updated this position: {}\n", this->position.transpose());
-//     spdlog::debug("Updated this velocity: {}\n", this->velocity.transpose());
-//     spdlog::debug("Updated this orientation (quaternion): {}\n", this->orientation.coeffs().transpose());
-//     spdlog::debug("Updated covariance P:\n {}\n", this->P);
-// }
-
 void EKF::ekf_loop(Vector3d& u_t_1, const float& v_t, const float& w_t) {
     if (fabs(w_t) < 1e-6)
     {
@@ -156,6 +92,5 @@ void EKF::ekf_loop(Vector3d& u_t_1, const float& v_t, const float& w_t) {
     {
         predict(u_t_1, v_t, w_t, dt);
     }
-    // update(acc_data, dt, Sigma_a);
 
 }

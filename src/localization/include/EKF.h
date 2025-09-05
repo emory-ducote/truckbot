@@ -27,12 +27,9 @@ class EKF {
         MatrixXd compute_Q(const Matrix3d& Sigma_a, const Matrix3d& Sigma_omega);
         MatrixXd compute_H(Vector3d gravity_n);
         MatrixXd compute_R(const Matrix3d& Sigma_a);
-        void predict(const Vector3d& u_t_1, const float& v_t, const float& w_t, const double& dt);
-        
-        // void update(Vector3d& acc_data, double dt, const Matrix3d&Sigma_a);
-    
-        
+        void predict(const Vector3d& u_t_1, const float& v_t, const float& w_t, const double& dt);    
         const double dt = 1.0f / frequency;
+        //TODO: tune these noises
         double alpha_1 = 0.01f;
         double alpha_2 = 0.01f;
         double alpha_3 = 0.01f;

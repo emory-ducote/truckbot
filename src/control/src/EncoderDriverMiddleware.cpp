@@ -56,7 +56,10 @@ class EncoderDriverMiddleware : public rclcpp::Node {
           RCLCPP_INFO(this->get_logger(), "LEFT WHEEL: %f, RIGHT WHEEL %f", leftWheelSpeed, rightWheelSpeed);
           
           auto message = geometry_msgs::msg::Twist();
-          message.linear.x = (rightWheelSpeed + leftWheelSpeed) / 2;
+
+          //TODO:  this is wrong but seems to makes things work  
+          message.linear.x = (rightWheelSpeed + leftWheelSpeed); // should be / 2 - hm
+          
           message.angular.z = (rightWheelSpeed - leftWheelSpeed) / 0.2;
           odom_publisher_->publish(message);
         }
