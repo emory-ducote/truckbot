@@ -25,8 +25,8 @@ class EncoderDriverMiddleware : public rclcpp::Node {
         int leftRearA = this->declare_parameter<int>("leftRearA", 25);
         int leftRearB = this->declare_parameter<int>("leftRearB", 8);
 
-        std::string encoder_topic = this->declare_parameter<std::string>("encoder_topic", "/encoder/data");
-        int update_rate = this->declare_parameter<int>("update_rate", 100);
+        std::string encoder_topic = this->declare_parameter<std::string>("encoder_odometry_topic", "/odom");
+        int update_rate = this->declare_parameter<int>("update_rate", 10);
 
         // Create EncoderDriver objects
         rightFront = std::make_shared<EncoderDriver>(chip, rightFrontA, rightFrontB, wheelRadius, encoderCPR, encoderMultiplier);
@@ -56,7 +56,10 @@ class EncoderDriverMiddleware : public rclcpp::Node {
           RCLCPP_INFO(this->get_logger(), "LEFT WHEEL: %f, RIGHT WHEEL %f", leftWheelSpeed, rightWheelSpeed);
           
           auto message = geometry_msgs::msg::Twist();
-          message.linear.x = (rightWheelSpeed + leftWheelSpeed) / 2;
+
+          //TODO:  this is wrong but seems to makes things work  
+          message.linear.x = (rightWheelSpeed + leftWheelSpeed); // should be / 2 - hm
+          
           message.angular.z = (rightWheelSpeed - leftWheelSpeed) / 0.2;
           odom_publisher_->publish(message);
         }

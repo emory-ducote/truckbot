@@ -1,6 +1,6 @@
 encoder_driver:
   ros__parameters:
-    wheel_radius: 0.03 # meters
+    wheel_radius: 0.05 # meters
     encoder_cpr: 700
     encoder_multiplier: 4 # gearbox shaft resolution in X4 mode
     encoder_odometry_topic: "/odom"
