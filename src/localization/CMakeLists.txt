@@ -32,9 +32,17 @@ add_executable(ekf
 target_link_libraries(ekf Eigen3::Eigen fmt::fmt)
 ament_target_dependencies(ekf rclcpp sensor_msgs std_msgs nav_msgs)
 
+add_executable(particle_filter
+  src/ParticleFilterMiddleware.cpp
+  src/ParticleFilter.cpp
+)
+
+target_link_libraries(particle_filter Eigen3::Eigen)
+ament_target_dependencies(particle_filter rclcpp)
 
 install(TARGETS
   ekf
+  particle_filter
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
