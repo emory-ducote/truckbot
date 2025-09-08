@@ -12,7 +12,7 @@
 using namespace Eigen;
 
 
-double wrapAngle(double angle) {
+inline double wrapAngle(double angle) {
     angle = std::fmod(angle + M_PI, 2 * M_PI);  // shift by +π, wrap modulo 2π
     if (angle < 0)
         angle += 2 * M_PI;                       // ensure it's positive
@@ -23,6 +23,7 @@ class ParticleFilter {
     public:
         ParticleFilter(const int numParticles = 100, const int frequency = 20);
         ~ParticleFilter();
+        std::vector<Particle> getParticles() { return particles;}
 
         void sampleNewParticlePose(Particle& particle, Vector2d& u_t, double dt);
         bool landmarkInRange(const Vector3d& state, const Vector2d& landmarkState);
@@ -34,7 +35,7 @@ class ParticleFilter {
                                             std::vector<MatrixXd>& Qs);
         void landmarkUpdate(Particle& particle, Vector2d& z_t, Vector2d& u_t);
         std::vector<int> systematicResample(const std::vector<double>& weights);
-        std::vector<Particle> particleUpdate(std::vector<Particle>& particles, Vector2d& z_t, Vector2d& u_t);
+        std::vector<Particle> particleUpdate(std::vector<Particle> particles, Vector2d& z_t, Vector2d& u_t);
     private:
         const int numParticles;
         std::vector<Particle> particles;
@@ -42,6 +43,7 @@ class ParticleFilter {
         const double dt = 1 / frequency;
         Matrix2d Q_t; 
         const double p_0 = 0.01;
+        Vector3d initial_sigmas;
 
 };
 

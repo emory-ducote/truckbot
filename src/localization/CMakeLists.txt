@@ -37,7 +37,7 @@ add_executable(particle_filter
   src/ParticleFilter.cpp
 )
 
-target_link_libraries(particle_filter Eigen3::Eigen)
+target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt)
 ament_target_dependencies(particle_filter rclcpp)
 
 install(TARGETS
