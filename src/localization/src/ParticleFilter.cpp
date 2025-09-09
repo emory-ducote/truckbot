@@ -26,7 +26,7 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                particles(numParticles),
                                frequency(frequency) {
     spdlog::set_level(spdlog::level::debug);
-    initial_sigmas << 0.1, 0.1, 0.05;
+    initial_sigmas << 1.0, 1.0, 0.05;
     // initial_sigmas << 0.0, 0.0, 0.00;
     for (int m = 0; m < numParticles; m++)
     {
@@ -220,6 +220,11 @@ std::vector<int> ParticleFilter::systematicResample(const std::vector<double>& w
 
 std::vector<Particle> ParticleFilter::particleUpdate(std::vector<Particle> particles, Vector2d& z_t, Vector2d& u_t)
 {
+    for (Particle& particle: particles) 
+    {
+        sampleNewParticlePose(particle, u_t, dt);
+    }
+
     double weightSum = 0;
     // main landmark update
     for (Particle& particle : particles)

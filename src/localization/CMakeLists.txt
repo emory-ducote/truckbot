@@ -40,9 +40,16 @@ add_executable(particle_filter
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt)
 ament_target_dependencies(particle_filter rclcpp)
 
+add_executable(particle_filter_simulator
+  src/ParticleFilterSimulator.cpp
+)
+
+target_link_libraries(particle_filter_simulator Eigen3::Eigen)
+
 install(TARGETS
   ekf
   particle_filter
+  particle_filter_simulator
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
