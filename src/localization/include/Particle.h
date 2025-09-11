@@ -18,6 +18,9 @@ class Particle {
         inline Vector3d getState() {
             return x;
         }
+        inline void setState(Vector3d newX) {
+            x = newX;
+        }
         inline MatrixXd getCovariance() {
             return P;
         }

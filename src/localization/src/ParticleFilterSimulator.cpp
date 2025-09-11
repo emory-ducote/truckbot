@@ -1,30 +1,66 @@
-#include <cmath>
+#include "rclcpp/rclcpp.hpp"
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include "ParticleFilter.h"
+#include <fstream>
 
-int main(int argc, char** argv) {
+using namespace Eigen;
 
-    ParticleFilter filter(100, 1);
+int main() {
+    ParticleFilter filter(10, 1);
 
-    Vector2d landmarkPosition(2, 0);
-    Vector2d vehiclePosition(0, 0);
+    Vector2d landmarkPosition1(2, 0);
+    Vector2d landmarkPosition2(2, 1);
+    Vector2d landmarkPosition3(2, 2);
+    Vector2d landmarkPosition4(0, 2);
+    Vector2d landmarkPosition5(0, 1);
+    std::vector<Vector2d> landmarks;
+    landmarks.push_back(landmarkPosition1);
+    // landmarks.push_back(landmarkPosition2);
+    // landmarks.push_back(landmarkPosition3);
+    // landmarks.push_back(landmarkPosition4);
+    // landmarks.push_back(landmarkPosition5);
+
+
+    Vector3d vehiclePosition(0.0, 0.0, 0.0);
 
     std::vector<Particle> resampled = filter.getParticles();
 
-    for (int i = 0; i < 50; i++) 
-    {
-        double deltaX = landmarkPosition[0] - vehiclePosition[0];
-        double deltaY = landmarkPosition[1] - vehiclePosition[1];
-        double q = pow(deltaX, 2) + pow(deltaY, 2);
-        double r = std::sqrt(q);
-        double theta = atan2(deltaY, deltaX) - vehiclePosition[2];
+    std::ofstream file("particles_log.csv");
+    file << "step,type,x,y,theta\n";  // CSV header
+    
 
-        Vector2d u_t(0.1, 0.0);
-        Vector2d z_t(r, theta);
+    for (int step = 0; step < 20; step++) {
+            double deltaX = landmarks[0][0] - vehiclePosition[0];
+            double deltaY = landmarks[0][1] - vehiclePosition[1];
+            double q = pow(deltaX, 2) + pow(deltaY, 2);
+            double r = std::sqrt(q);
+            double theta1 = atan2(deltaY, deltaX) - vehiclePosition[2];
 
-        std::vector<Particle> resampled = filter.particleUpdate(resampled, z_t, u_t);
+            Vector2d u_t(0.1, 0.00001);
+            Vector2d z_t(r, theta1);
 
-        vehiclePosition += u_t;
+            resampled = filter.particleUpdate(resampled, z_t, u_t);
+
+            double v_t = u_t[0];
+            double w_t = u_t[1];
+            double theta = vehiclePosition[2];
+            vehiclePosition[0] += (v_t / w_t) * (sin(theta + w_t) - sin(theta));
+            vehiclePosition[1] += (v_t / w_t) * (cos(theta + w_t) - cos(theta));
+            vehiclePosition[2] = wrapAngle(theta + w_t);
+
+        // Log particles
+        for (auto &p : resampled) {
+            file << step << ",particle," << p.getState()[0] << "," << p.getState()[1] << "," << p.getState()[2] << "\n";
+            // std::cout << "weight: " << p.getWeight() << std::endl;
+        }
+
+        // Log vehicle
+        file << step << ",vehicle," << vehiclePosition[0] << "," << vehiclePosition[1] << "," << vehiclePosition[2] << "\n";
+
+        // Log landmark (no theta)
+        file << step << ",landmark," << landmarks[0][0] << "," << landmarks[0][1] << ",0\n";
     }
-
-    return 0;
-  }
+        file.close();
+        return 0;
+}

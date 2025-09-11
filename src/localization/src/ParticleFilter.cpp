@@ -26,7 +26,7 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                particles(numParticles),
                                frequency(frequency) {
     spdlog::set_level(spdlog::level::debug);
-    initial_sigmas << 1.0, 1.0, 0.05;
+    initial_sigmas << 1.0, 1.0, 0.00;
     // initial_sigmas << 0.0, 0.0, 0.00;
     for (int m = 0; m < numParticles; m++)
     {
@@ -54,9 +54,11 @@ void ParticleFilter::sampleNewParticlePose(Particle& particle, Vector2d& u_t, do
     double v_t = u_t[0];
     double w_t = u_t[1];
     double theta = particle.getState()[2];
-    particle.getState()[0] += (v_t / w_t) * (sin(theta + w_t * dt) - sin(theta));
-    particle.getState()[1] += (v_t / w_t) * (cos(theta + w_t * dt) - cos(theta));
-    particle.getState()[2] = wrapAngle(theta + w_t * dt);
+    double x = particle.getState()[0] + ((v_t / w_t) * (sin(theta + w_t * dt) - sin(theta)));
+    double y = particle.getState()[1]  +((v_t / w_t) * (cos(theta + w_t * dt) - cos(theta)));
+    double theta_new = particle.getState()[2]  +wrapAngle(theta + w_t * dt);
+    particle.setState(Vector3d(x, y, theta_new));
+
 }
 
 bool ParticleFilter::landmarkInRange(const Vector3d& state, const Vector2d& landmarkState)
@@ -130,15 +132,18 @@ void ParticleFilter::landmarkUpdate(Particle& particle, Vector2d& z_t, Vector2d&
     std::vector<MatrixXd> Qs(landmarkCount);
 
     this->updateLikelihoodCorrespondence(particle, z_t, weights, z_hats, Hs, Qs);
+
     weights.push_back(p_0); // importance factor new feature
     size_t newFeatureIndex = weights.size() - 1;
 
     int heaviestFeature = std::distance(weights.begin(),
                                     std::max_element(weights.begin(), weights.end()));
+    std::cout << "HEAVIEST: " << heaviestFeature << " " << weights[heaviestFeature]<< std::endl;
     particle.setWeight(weights[heaviestFeature]);
 
     // Loop over both existing landmarks AND the "new landmark slot"
     for (int j = 0; j <= particle.landmarkCount(); j++) {
+        
         if (j == particle.landmarkCount()) {
             // --- Handle NEW landmark hypothesis ---
             if (heaviestFeature == j) {
@@ -158,7 +163,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, Vector2d& z_t, Vector2d&
 
                 MatrixXd sigma_j_t = (H_j.inverse().transpose()) * Q_t * H_j.inverse();
 
-                particle.addLandmark(Landmark(mu_j_t, sigma_j_t));
+                particle.addLandmark(Landmark(mu_j_t, sigma_j_t, newParticleIncrease));
             }
         } else {
             // --- Handle EXISTING landmarks ---
@@ -170,7 +175,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, Vector2d& z_t, Vector2d&
                 Vector2d mu_j_t = landmark.getState() + K * (z_t - z_hats[j]);
                 MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * Hs[j]) * landmark.getCovariance();
 
-                landmark.updateLandmark(mu_j_t, sigma_j_t, landmark.landmarkCounter() + 1);
+                landmark.updateLandmark(mu_j_t, sigma_j_t, landmark.landmarkCounter() + newParticleIncrease);
 
             } else {
                 spdlog::debug("Unseen landmark {}", j);
@@ -222,7 +227,7 @@ std::vector<Particle> ParticleFilter::particleUpdate(std::vector<Particle> parti
 {
     for (Particle& particle: particles) 
     {
-        sampleNewParticlePose(particle, u_t, dt);
+        this->sampleNewParticlePose(particle, u_t, dt);
     }
 
     double weightSum = 0;
@@ -242,6 +247,9 @@ std::vector<Particle> ParticleFilter::particleUpdate(std::vector<Particle> parti
     }
     
     std::vector<int> resampledIndices = systematicResample(normalizedWeights);
+    for (int i =0; i < resampledIndices.size() ; i++) {
+        
+    }
     
     std::vector<Particle> resampledParticles(numParticles);
     for (int m = 0; m < numParticles; m++)
