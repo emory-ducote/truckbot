@@ -25,8 +25,8 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                numParticles(numParticles),
                                particles(numParticles),
                                frequency(frequency) {
-    spdlog::set_level(spdlog::level::debug);
-    initial_sigmas << 1.0, 1.0, 0.00;
+    spdlog::set_level(spdlog::level::info);
+    initial_sigmas << 5.0, 5.0, 3.14;
     // initial_sigmas << 0.0, 0.0, 0.00;
     for (int m = 0; m < numParticles; m++)
     {
