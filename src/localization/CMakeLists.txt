@@ -3,7 +3,7 @@ project(localization)
 
 #Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -17,6 +17,8 @@ find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(fmt REQUIRED)
+find_package(TBB REQUIRED)
+
 
 
 include_directories(
@@ -26,31 +28,30 @@ include_directories(
 add_executable(ekf
   src/EKFMiddleware.cpp
   src/EKF.cpp
-  src/LowPassFilter.cpp
 )
 
 target_link_libraries(ekf Eigen3::Eigen fmt::fmt)
 ament_target_dependencies(ekf rclcpp sensor_msgs std_msgs nav_msgs)
 
-add_executable(particle_filter
-  src/ParticleFilterMiddleware.cpp
-  src/ParticleFilter.cpp
-)
+# add_executable(particle_filter
+#   src/ParticleFilterMiddleware.cpp
+#   src/ParticleFilter.cpp
+# )
 
-target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt)
-ament_target_dependencies(particle_filter rclcpp)
+# target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
+# ament_target_dependencies(particle_filter rclcpp)
 
 add_executable(particle_filter_simulator
   src/ParticleFilterSimulator.cpp
   src/ParticleFilter.cpp
 )
 
-target_link_libraries(particle_filter_simulator Eigen3::Eigen fmt::fmt )
+target_link_libraries(particle_filter_simulator Eigen3::Eigen fmt::fmt TBB::tbb)
 ament_target_dependencies(particle_filter_simulator rclcpp)
 
 install(TARGETS
   ekf
-  particle_filter
+  # particle_filter
   particle_filter_simulator
   DESTINATION lib/${PROJECT_NAME})
 

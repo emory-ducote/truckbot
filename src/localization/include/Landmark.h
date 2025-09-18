@@ -9,39 +9,33 @@ using namespace Eigen;
 class Landmark {
     public:
         Landmark(Vector2d x=Vector2d::Zero(),
-                 MatrixXd P=MatrixXd::Identity(2, 2) * 1e-3,
-                 int counter=1) :
+                 MatrixXd P=Matrix2d::Identity(2, 2) * 1e-3,
+                 int count=1) :
                  x(x),
                  P(P),
-                 counter(counter) {}
+                 count(count) {}
                  
         ~Landmark() = default;
 
-        inline Vector2d getState() {
-            return x;
-        }
-        inline Matrix2d getCovariance() {
-            return P;
-        }
-        inline void sawLandmark() {
-            counter += 1;
-        }
-        inline void missedLandmark() {
-            counter -= 1;
-        }
-        inline int landmarkCounter() {
-            return counter;
-        }
-        inline void updateLandmark(Vector2d newX, MatrixXd newP, int newCounter) {
-            x = newX;
-            P = newP;
-            counter = newCounter;
-        }
+        const Vector2d& getState() { return x; }
 
+        void setState(const Vector2d& newX) { x = newX; }
+
+        const Matrix2d& getCovariance() { return P; }
+
+        void setCovariance(const MatrixXd newP) { P = newP; }
+        
+        void sawLandmark() { count += 1; }
+
+        void missedLandmark() { count -= 1; }
+
+        int getCount() const { return count; }
+
+        void setCount(const int newCount) { count = newCount; }
     private:
         Vector2d x;
-        MatrixXd P;
-        int counter;
+        Matrix2d P;
+        int count;
 };
 
 #endif
