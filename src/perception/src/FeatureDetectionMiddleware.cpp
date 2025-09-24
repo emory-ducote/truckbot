@@ -49,13 +49,19 @@ public:
       marker.color.a = 1.0;
 
       // Fill points
+      int point = 0;
+      double x_sum = 0;
+      double y_sum = 0;
       for (int idx : indices.indices) {
-        geometry_msgs::msg::Point pt;
-        pt.x = cloud->points[idx].x;
-        pt.y = cloud->points[idx].y;
-        pt.z = cloud->points[idx].z;
-        marker.points.push_back(pt);
+        x_sum += cloud->points[idx].x;
+        y_sum += cloud->points[idx].y;
+        point++;
       }
+      geometry_msgs::msg::Point pt;
+      pt.x = x_sum / point;
+      pt.y = y_sum / point;
+      pt.z = 0.0;
+      marker.points.push_back(pt);
 
       marker_array.markers.push_back(marker);
     }
