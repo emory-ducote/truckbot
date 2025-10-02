@@ -6,6 +6,8 @@
 #include <cmath>
 #include <spdlog/spdlog.h>
 #include "spdlog/fmt/ostr.h"
+#include "LocalizationHelpers.h"
+
 
 using namespace Eigen;
 

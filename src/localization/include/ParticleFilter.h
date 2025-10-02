@@ -16,7 +16,7 @@ class ParticleFilter {
     public:
         ParticleFilter(const int numParticles = 100, 
                        const double frequency = 20,
-                       const int newParticleIncrease = 2);
+                       const int newParticleIncrease = 1);
         ~ParticleFilter();
         std::vector<Particle> getParticles() { return particles;}
 
@@ -41,7 +41,7 @@ class ParticleFilter {
         const double frequency;
         const double dt = 1 / frequency;
         Matrix2d Q_t; 
-        const double p_0 = 1e-20;
+        const double p_0 = 1e-2;
         const int newParticleIncrease;
         Vector3d initialSigmas;
         

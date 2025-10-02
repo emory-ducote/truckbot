@@ -6,21 +6,8 @@
 #include "EKF.h"
 
 using namespace Eigen;
+using namespace LocalizationHelpers;
 using namespace std;
-
-template <typename T>
-struct fmt::formatter<T, char, std::enable_if_t<
-    std::is_base_of_v<Eigen::EigenBase<T>, T>>> {
-    
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-
-    template <typename FormatContext>
-    auto format(const T& mat, FormatContext& ctx) {
-        std::ostringstream oss;
-        oss << mat;
-        return fmt::format_to(ctx.out(), "{}", oss.str());
-    }
-};
 
 EKF::EKF(const double frequency, Vector3d x, MatrixXd P) :
             frequency(frequency), x(x), P(P) {
@@ -76,6 +63,7 @@ void EKF::predict(const Vector3d& u_t_1, const float& v_t, const float& w_t, con
                                  ((v_t / w_t) * cos(prev_theta)) - ((v_t / w_t) * cos(prev_theta + w_t * dt)),
                                   w_t * dt); 
     this->x = x + position_prediction;
+    this->x[2] = wrapAngle(this->x[2]);
     this->P = Gt * this->P * Gt.transpose() + Vt * Mt * Vt.transpose(); 
 
     spdlog::debug("Predicted position: {}\n", this->x.transpose());

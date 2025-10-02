@@ -34,8 +34,18 @@ target_link_libraries(feature_detector fmt::fmt)
 ament_target_dependencies(feature_detector rclcpp sensor_msgs laser_geometry 
                                            visualization_msgs pcl_conversions PCL)
   
+add_executable(voxelization
+  src/VoxelizationMiddleware.cpp
+  src/Voxelization.cpp
+)
+
+target_link_libraries(voxelization fmt::fmt)
+ament_target_dependencies(voxelization rclcpp sensor_msgs laser_geometry 
+                                           visualization_msgs pcl_conversions PCL)
+
 install(TARGETS
   feature_detector
+  voxelization
   DESTINATION lib/${PROJECT_NAME})
 
 
