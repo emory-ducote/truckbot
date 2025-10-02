@@ -66,17 +66,18 @@ void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u
 
 bool ParticleFilter::landmarkInRange(const Vector3d& state, const Vector2d& landmarkState)
 {
-    // TODO add range and bearing gate
-    double deltaX = landmarkState[0] - state[0];
-    double deltaY = landmarkState[1] - state[1];
-    double q = pow(deltaX, 2) + pow(deltaY, 2);
-    double r = std::sqrt(q);
-    double theta1 = wrapAngle(std::atan2(deltaY, deltaX));
-
     const double maxRange = 3.0;
-    const double maxAngle = 110.0 * M_PI / 180.0; // convert degrees → radians
+    const double maxAngle = 110.0 * M_PI / 180.0; // radians
 
-    return (r <= maxRange) && (theta1 >= -maxAngle && theta1 <= maxAngle);
+    double dx = landmarkState[0] - state[0];
+    double dy = landmarkState[1] - state[1];
+    double r = std::sqrt(dx * dx + dy * dy);
+    if (r > maxRange) return false;
+
+    double bearing_global = std::atan2(dy, dx);
+    double relative_bearing = wrapAngle(bearing_global - state[2]);
+
+    return (std::abs(relative_bearing) <= maxAngle);
 }
 
 void ParticleFilter::updateLikelihoodCorrespondence(Particle& particle, 
@@ -246,27 +247,28 @@ void ParticleFilter::particleWeightUpdate(std::vector<Particle>& particles, cons
 
 void ParticleFilter::particlePurgeLandmarks(std::vector<Particle>& particles)
 {
-    for (auto& particle: particles) 
-    {
-        for (int j = 0; j < particle.getLandmarkCount(); j++)
-        {
-            Landmark landmark = particle.getLandmarks()[j];
-            bool inRange = landmarkInRange(particle.getState(), landmark.getState());
-            bool wasSeen = std::find(particle.getSeenLandmarks().begin(), particle.getSeenLandmarks().end(), j) != particle.getSeenLandmarks().end();
-            
-            if ((inRange) && (!wasSeen))
+    std::for_each(std::execution::par, particles.begin(), particles.end(),
+        [&](Particle& particle) {
+            for (int j = 0; j < particle.getLandmarkCount(); j++)
             {
-                landmark.missedLandmark();
-                particle.updateLandmark(j, landmark);
-                if (particle.getLandmarks()[j].getCount() <= 0) {
-                    particle.removeLandmark(j);
-                    j--;
+                Landmark landmark = particle.getLandmarks()[j];
+                bool inRange = landmarkInRange(particle.getState(), landmark.getState());
+                bool wasSeen = std::find(particle.getSeenLandmarks().begin(),
+                                         particle.getSeenLandmarks().end(), j) 
+                               != particle.getSeenLandmarks().end();
+
+                if ((inRange) && (!wasSeen))
+                {
+                    landmark.missedLandmark();
+                    particle.updateLandmark(j, landmark);
+                    if (particle.getLandmarks()[j].getCount() <= 0) {
+                        particle.removeLandmark(j);
+                        j--;
+                    }
                 }
             }
-        }
-        particle.clearSeenLandmarks();
-
-    }
+            particle.clearSeenLandmarks();
+        });
 }
 
 std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Particle>& particles)

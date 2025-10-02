@@ -17,11 +17,11 @@ class Landmark {
                  
         ~Landmark() = default;
 
-        const Vector2d& getState() { return x; }
+        const Vector2d& getState() const { return x; }
 
         void setState(const Vector2d& newX) { x = newX; }
 
-        const Matrix2d& getCovariance() { return P; }
+        const Matrix2d& getCovariance() const { return P; }
 
         void setCovariance(const MatrixXd newP) { P = newP; }
         
