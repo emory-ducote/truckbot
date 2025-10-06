@@ -11,9 +11,9 @@
 
 class FeatureDetection {
     public:
-        FeatureDetection(const double clusterTolerance = 0.1,
-                         const double minClusterSize = 5.0,
-                         const double maxClusterSize = 100.0 );
+        FeatureDetection(const double clusterTolerance = 0.05,
+                         const double minClusterSize = 2.0,
+                         const double maxClusterSize = 10.0 );
         ~FeatureDetection();
         std::vector<pcl::PointIndices> euclideanCluster(pcl::PointCloud<pcl::PointXYZ>::Ptr cloudIn);
     private:
