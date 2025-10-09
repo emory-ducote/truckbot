@@ -5,6 +5,7 @@
 #include "spdlog/fmt/ostr.h"
 #include <execution>
 #include "ParticleFilter.h"
+#include "PersistentKDTree.h"
 
 using namespace LocalizationHelpers;
 
@@ -41,11 +42,19 @@ ParticleFilter::~ParticleFilter(){}
 
 void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u_t, double dt) 
 {
-    double v_t = u_t[0];   // linear velocity (m/s)
-    double w_t = u_t[1];   // angular velocity (rad/s)
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::normal_distribution<> dist_v(0.0, 0.5);
+    std::normal_distribution<> dist_w(0.0, 0.5);
+
+
+    double v_t = u_t[0] + dist_v(gen);   // linear velocity (m/s)
+    double w_t = u_t[1] + dist_w(gen);   // angular velocity (rad/s)
     double theta = particle.getState()[2];
 
     double x, y, theta_new;
+
 
     if (std::abs(w_t) < 1e-6) {
         // Straight line motion
@@ -297,7 +306,7 @@ std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Parti
     }
 
     // Set Neff threshold (e.g., half the number of particles)
-    double neff_threshold = 0.666 * numParticles;
+    double neff_threshold = 0.5 * numParticles;
     std::vector<Particle> resampledParticles;
     if (neff < neff_threshold) {
         std::vector<int> resampledIndices = systematicResample(normalizedWeights);
