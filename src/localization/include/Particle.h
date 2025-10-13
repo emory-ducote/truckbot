@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include "Landmark.h"
+#include "PersistentKDTree.h"
 
 using namespace Eigen;
 
@@ -24,36 +25,56 @@ class Particle {
 
         void setCovariance(const Matrix3d newP) { P = newP; }
 
-        size_t getLandmarkCount() const { return landmarks.size(); }
+        // size_t getLandmarkCount() const { return landmarks.size(); }
         
-        const std::vector<Landmark> getLandmarks() { return landmarks; }
+        // const std::vector<Landmark> getLandmarks() { return landmarks; }
         
-        void removeLandmark(int index) 
+        void removeLandmark(Landmark& landmark) 
         {
-            landmarks.erase(landmarks.begin() + index);
+            Vector2d point = landmark.getState();
+            double points[2] = {point(0), point(1)};
+            tree = deleteNode(tree, points);
+            // landmarks.erase(landmarks.begin() + index);
         }
 
-        void addLandmark(const Landmark& landmark) { landmarks.push_back(landmark); }
+        void addLandmark(const Landmark& landmark) { 
+            Vector2d point = landmark.getState();
+            Matrix2d cov = landmark.getCovariance();
+            double points[2] = {point(0), point(1)};
+            tree = insert(tree, points, cov); 
+        }
 
-        void updateLandmark(int index, Landmark& landmark) 
+        void updateLandmark(Landmark& oldLandmark, Landmark& newLandmark) 
         {
-            landmarks[index] = landmark;
+            removeLandmark(oldLandmark);
+            addLandmark(newLandmark);
+        }
+
+        double[2] searchLandmark(Landmark& landmark)
+        {
+            Vector2d point = landmark.getState();
+            double points[2] = {point(0), point(1)};
+            const Node * best = findNearest(tree, points);
+            if (best == nullptr) {
+                return 
+            }
         }
 
         double getWeight() const { return weight; }
 
         void setWeight(double newWeight) { weight = newWeight; }
 
-        std::vector<int>& getSeenLandmarks() { return seenLandmarks; }
+        // std::vector<int>& getSeenLandmarks() { return seenLandmarks; }
 
-        void addSeenLandmark(const int index) { seenLandmarks.push_back(index) ; }
+        // void addSeenLandmark(const int index) { seenLandmarks.push_back(index) ; }
 
-        void clearSeenLandmarks() { seenLandmarks.clear(); }
+        // void clearSeenLandmarks() { seenLandmarks.clear(); }
     private:
         Vector3d x;
         Matrix3d P;
-        std::vector<Landmark> landmarks;
-        std::vector<int> seenLandmarks;
+        std::shared_ptr<const Node> tree = nullptr;
+        // std::vector<Landmark> landmarks;
+        // std::vector<int> seenLandmarks;
         double weight = 1.0;
 };
 

@@ -5,7 +5,6 @@
 #include "spdlog/fmt/ostr.h"
 #include <execution>
 #include "ParticleFilter.h"
-#include "PersistentKDTree.h"
 
 using namespace LocalizationHelpers;
 

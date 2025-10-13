@@ -27,6 +27,7 @@ struct Node {
     }
 };
 
+
 std::shared_ptr<const Node> insertRec(std::shared_ptr<const Node> root, 
                                       double point[], 
                                       Matrix2d P,
