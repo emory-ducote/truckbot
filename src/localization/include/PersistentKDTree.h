@@ -1,3 +1,4 @@
+#pragma once
 #include <memory>
 #include <algorithm>
 #include <limits>
@@ -28,7 +29,7 @@ struct Node {
 };
 
 
-std::shared_ptr<const Node> insertRec(std::shared_ptr<const Node> root, 
+inline std::shared_ptr<const Node> insertRec(std::shared_ptr<const Node> root, 
                                       double point[], 
                                       Matrix2d P,
                                       unsigned depth)
@@ -55,14 +56,14 @@ std::shared_ptr<const Node> insertRec(std::shared_ptr<const Node> root,
     return root;
 }
 
-std::shared_ptr<const Node> insert(std::shared_ptr<const Node> root,
+inline std::shared_ptr<const Node> insert(std::shared_ptr<const Node> root,
                                    double point[],
                                    Matrix2d P)
 {
     return insertRec(root, point, P, 0);
 }
 
-std::shared_ptr<const Node> minNode(std::shared_ptr<const Node> x, 
+inline std::shared_ptr<const Node> minNode(std::shared_ptr<const Node> x, 
                                     std::shared_ptr<const Node> y, 
                                     std::shared_ptr<const Node> z, 
                                     int d)
@@ -75,7 +76,7 @@ std::shared_ptr<const Node> minNode(std::shared_ptr<const Node> x,
     return res;
 }
 
-std::shared_ptr<const Node> findMinRec(std::shared_ptr<const Node> root, 
+inline std::shared_ptr<const Node> findMinRec(std::shared_ptr<const Node> root, 
                                        int d, 
                                        unsigned depth)
 {
@@ -95,13 +96,13 @@ std::shared_ptr<const Node> findMinRec(std::shared_ptr<const Node> root,
                    findMinRec(root->right, d, depth + 1), d);
 }
 
-std::shared_ptr<const Node> findMin(std::shared_ptr<const Node> root, int d)
+inline std::shared_ptr<const Node> findMin(std::shared_ptr<const Node> root, int d)
 {
     // Pass current level or depth as 0
     return findMinRec(root, d, 0);
 }
 
-bool arePointsSame(const double point1[], const double point2[])
+inline bool arePointsSame(const double point1[], const double point2[])
 {
     for (int i = 0; i < k; ++i)
         if (point1[i] != point2[i])
@@ -110,13 +111,13 @@ bool arePointsSame(const double point1[], const double point2[])
     return true;
 }
 
-void copyPoint(double p1[],const double p2[])
+inline void copyPoint(double p1[],const double p2[])
 {
    for (int i=0; i<k; i++)
        p1[i] = p2[i];
 }
 
-std::shared_ptr<const Node> deleteNodeRec(std::shared_ptr<const Node> root,
+inline std::shared_ptr<const Node> deleteNodeRec(std::shared_ptr<const Node> root,
                                        const double point[],
                                        unsigned depth)
 {
@@ -165,13 +166,13 @@ std::shared_ptr<const Node> deleteNodeRec(std::shared_ptr<const Node> root,
     }
 }
 
-std::shared_ptr<const Node> deleteNode(std::shared_ptr<const Node> root, double point[])
+inline std::shared_ptr<const Node> deleteNode(std::shared_ptr<const Node> root, double point[])
 {
    // Pass depth as 0
    return deleteNodeRec(root, point, 0);
 }
 
-void printKDTree(std::shared_ptr<const Node> root, int depth = 0)
+inline void printKDTree(std::shared_ptr<const Node> root, int depth = 0)
 {
     if (!root) return;
 
@@ -189,7 +190,7 @@ void printKDTree(std::shared_ptr<const Node> root, int depth = 0)
     printKDTree(root->left, depth + 1);
 }
 
-double distanceSquared(const double a[], const double b[]) {
+inline double distanceSquared(const double a[], const double b[]) {
     double dist = 0.0;
     for (size_t i = 0; i < k; ++i) {
         double diff = a[i] - b[i];
@@ -198,7 +199,7 @@ double distanceSquared(const double a[], const double b[]) {
     return dist;
 }
 
-void nearestNeighbor(
+inline void nearestNeighbor(
     std::shared_ptr<const Node> root,
     const double target[k],
     int depth,
@@ -224,7 +225,7 @@ void nearestNeighbor(
     }
 }
 
-const Node* findNearest(std::shared_ptr<const Node> root, const double target[k]) {
+inline const Node* findNearest(std::shared_ptr<const Node> root, const double target[k]) {
     const Node* best = nullptr;
     double bestDist = std::numeric_limits<double>::infinity();
     nearestNeighbor(root, target, 0, best, bestDist);

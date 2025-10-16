@@ -17,7 +17,7 @@ int main() {
 
     // Place landmarks in a non-symmetrical L shape: 10 along x-axis (y=0), 5 along y-axis (x=0, y from 0 to 10)
     int num_landmarks_x = 10;
-    int num_landmarks_y = 5;
+    int num_landmarks_y = 15;
     double x_min = -10.0, x_max = 10.0;
     double y_min = 0.0, y_max = 10.0;
     double dx = (num_landmarks_x > 1) ? (x_max - x_min) / (num_landmarks_x - 1) : 0.0;
@@ -94,7 +94,7 @@ int main() {
                 vehiclePosition[1] += (v_t / w_t) * (std::cos(theta + w_t) - std::cos(theta));
                 vehiclePosition[2] = wrapAngle(theta + w_t);
             }
-        filter.particlePurgeLandmarks(resampled);
+        // filter.particlePurgeLandmarks(resampled);
         resampled = filter.particleWeightResampling(resampled);
         // Log particles and their landmark estimates
         int particle_id = 0;
@@ -102,13 +102,14 @@ int main() {
         for (auto &p : resampled) {
             file << step << ",particle," << p.getState()[0] << "," << p.getState()[1] << "," << p.getState()[2] << "," << particle_id << ",," << p.getWeight() << "\n";
             // Log landmark estimates for this particle
-            auto landmark_estimates = p.getLandmarks(); // Assumes vector<Vector2d>
-            int landmark_id = 0;
-            for (auto& est : landmark_estimates) {
-                file << step << ",particle_landmark," << est.getState()[0] << "," << est.getState()[1] << ",0," << particle_id << "," << landmark_id  << "," << p.getWeight() << "\n";
-                landmark_id++;
-            }
+            // auto landmark_estimates = p.getLandmarks(); // Assumes vector<Vector2d>
+            // int landmark_id = 0;
+            // for (auto& est : landmark_estimates) {
+            //     file << step << ",particle_landmark," << est.getState()[0] << "," << est.getState()[1] << ",0," << particle_id << "," << landmark_id  << "," << p.getWeight() << "\n";
+            //     landmark_id++;
+            // }
             particle_id++;
+            printKDTree(p.tree);
             // std::cout << "particle: " << particle_id << " landmakrs: " << p.getLandmarks().size() << std::endl;
         }
 

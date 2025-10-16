@@ -18,16 +18,21 @@ class ParticleFilter {
                        const double frequency = 20,
                        const int newParticleIncrease = 1);
         ~ParticleFilter();
+
+        struct LikelihoodResult {
+            double weight;
+            Eigen::Vector2d z_hat;
+            Eigen::Matrix2d H;
+            Eigen::Matrix2d Q;
+            Eigen::Vector2d prevX;
+            Eigen::Matrix2d prevP;
+        };
+
         std::vector<Particle> getParticles() { return particles;}
 
         void sampleNewParticlePose(Particle& particle, const Vector2d& u_t, double dt);
         bool landmarkInRange(const Vector3d& state, const Vector2d& landmarkState);
-        void updateLikelihoodCorrespondence(Particle& particle, 
-                                            const Vector2d& z_t, 
-                                            std::vector<double>& weights,
-                                            std::vector<Vector2d>& z_hats,
-                                            std::vector<Matrix2d>& Hs,
-                                            std::vector<MatrixXd>& Qs);
+        LikelihoodResult updateLikelihoodCorrespondence(Particle& particle, const Vector2d& z_t);
         void landmarkUpdate(Particle& particle, const Vector2d& z_t);
         std::vector<int> systematicResample(const std::vector<double>& weights);
         void particleMotionUpdate(std::vector<Particle>& particles, const Vector2d& u_t);
@@ -45,7 +50,7 @@ class ParticleFilter {
         const int newParticleIncrease;
         Vector3d initialSigmas;
         
-
+        
 };
 
 #endif

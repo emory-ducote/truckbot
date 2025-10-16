@@ -31,15 +31,15 @@ class Particle {
         
         void removeLandmark(Landmark& landmark) 
         {
-            Vector2d point = landmark.getState();
+            Vector2d point = landmark.x;
             double points[2] = {point(0), point(1)};
             tree = deleteNode(tree, points);
             // landmarks.erase(landmarks.begin() + index);
         }
 
         void addLandmark(const Landmark& landmark) { 
-            Vector2d point = landmark.getState();
-            Matrix2d cov = landmark.getCovariance();
+            Vector2d point = landmark.x;
+            Matrix2d cov = landmark.P;
             double points[2] = {point(0), point(1)};
             tree = insert(tree, points, cov); 
         }
@@ -50,14 +50,10 @@ class Particle {
             addLandmark(newLandmark);
         }
 
-        double[2] searchLandmark(Landmark& landmark)
+        const Node * searchLandmark(double points[2])
         {
-            Vector2d point = landmark.getState();
-            double points[2] = {point(0), point(1)};
             const Node * best = findNearest(tree, points);
-            if (best == nullptr) {
-                return 
-            }
+            return best;
         }
 
         double getWeight() const { return weight; }
@@ -69,10 +65,10 @@ class Particle {
         // void addSeenLandmark(const int index) { seenLandmarks.push_back(index) ; }
 
         // void clearSeenLandmarks() { seenLandmarks.clear(); }
+        std::shared_ptr<const Node> tree = nullptr;
     private:
         Vector3d x;
         Matrix3d P;
-        std::shared_ptr<const Node> tree = nullptr;
         // std::vector<Landmark> landmarks;
         // std::vector<int> seenLandmarks;
         double weight = 1.0;

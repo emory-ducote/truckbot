@@ -88,119 +88,110 @@ bool ParticleFilter::landmarkInRange(const Vector3d& state, const Vector2d& land
     return (std::abs(relative_bearing) <= maxAngle);
 }
 
-void ParticleFilter::updateLikelihoodCorrespondence(Particle& particle, 
-                                                    const Vector2d& z_t, 
-                                                    std::vector<double>& weights,
-                                                    std::vector<Vector2d>& z_hats,
-                                                    std::vector<Matrix2d>& Hs,
-                                                    std::vector<MatrixXd>& Qs)
+ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(Particle& particle, const Vector2d& z_t)
 {
-    size_t landmarkCount = particle.getLandmarkCount();
-    spdlog::debug("Updating likelihood of {} landmarks", landmarkCount);
+    LikelihoodResult result;
 
-    for (size_t j = 0; j < particle.getLandmarkCount(); j++)
-    {
-        Landmark landmark = particle.getLandmarks()[j];
-        // some useful calculations for forming our prediction
-        // and jacobian matrices
-        double deltaX = landmark.getState()[0] - particle.getState()[0];
-        double deltaY = landmark.getState()[1] - particle.getState()[1];
-        double q = pow(deltaX, 2) + pow(deltaY, 2);
-        double r = std::sqrt(q);
-        double theta = wrapAngle(atan2(deltaY, deltaX) - particle.getState()[2]);
-        
-        // measurement prediction
-        Vector2d z_hat_j(r, theta);
-        
-        // measurement jacobian
-        Matrix2d H_j;
-        H_j << deltaX / r, deltaY / r,
-             - deltaY / q, deltaX / q;
+    double mapX = particle.getState()[0] + z_t[0] * cos(particle.getState()[2] + z_t[1]);
+    double mapY = particle.getState()[1] + z_t[0] * sin(particle.getState()[2] + z_t[1]);
+    double points[2] = {mapX, mapY};
+    const Node * nearest = particle.searchLandmark(points);
+    if (nearest == nullptr) {
+        spdlog::debug("No nearest!");
+        result.weight = 1e-9; 
+        result.z_hat.setZero();
+        result.H.setZero();
+        result.Q.setIdentity();
+        result.prevX.setZero();
+        result.prevP.setIdentity();
+        return result;
+    }
+    
+    double deltaX = mapX - particle.getState()[0];
+    double deltaY = mapY - particle.getState()[1];
+    double q = pow(deltaX, 2) + pow(deltaY, 2);
+    double r = std::sqrt(q);
+    double theta = wrapAngle(atan2(deltaY, deltaX) - particle.getState()[2]);
+    
+    // measurement prediction
+    Vector2d z_hat_j(r, theta);
+    
+    // measurement jacobian
+    Matrix2d H_j;
+    H_j << deltaX / r, deltaY / r,
+            - deltaY / q, deltaX / q;
 
-        Vector2d innovation = z_t - z_hat_j;
-        Matrix2d Q_j;
-        double w_j;
-       
-        if ((innovation(0) > 1.0) || (innovation(1) > 0.3)) {
-            w_j = 1e-9;
-            Q_j = Matrix2d::Identity() * 10;
-        }
-        else {
-            // measurement covariance
-            Q_j = H_j * landmark.getCovariance() * H_j.transpose() + Q_t;
+    Vector2d innovation = z_t - z_hat_j;
+    Matrix2d Q_j;
+    double w_j;
     
-            // small perturbation may make things more stable
-            Q_j += 1e-9 * Matrix2d::Identity();
-    
-            // likelihood of correspondence
-            // std::cout << "INNOVATION: "<< innovation << std::endl;
-            
-            double exponent = -0.5 * innovation.transpose() * Q_j.inverse() * innovation;
-            double normalizer = std::pow(2 * M_PI, z_t.size() / 2.0) * std::sqrt(Q_j.determinant());
-            w_j = std::exp(exponent) / normalizer;
-        }
+    if ((innovation(0) > 1.0) || (innovation(1) > 0.3)) {
+        w_j = 1e-9;
+        Q_j = Matrix2d::Identity() * 10;
+    }
+    else {
+        // measurement covariance
+        Q_j = H_j * nearest->P * H_j.transpose() + Q_t;
+
+        // small perturbation may make things more stable
+        Q_j += 1e-9 * Matrix2d::Identity();
         
-        // spdlog::debug("landmark covariance {}", landmark.getCovariance());
-        // spdlog::debug("landmark innovation \n{}", innovation);
-        // spdlog::debug("H_j {}", H_j);
-        // spdlog::debug("z_hat_j {}", z_hat_j);
-        // spdlog::debug("Exponent: {}, Normalizer: {}", exponent, normalizer);
-        // spdlog::debug("Calculated weight {}", w_j);
-        
-        weights[j] = w_j;
-        z_hats[j] = z_hat_j;
-        Hs[j] = H_j;
-        Qs[j] = Q_j;
+        double exponent = -0.5 * innovation.transpose() * Q_j.inverse() * innovation;
+        double normalizer = std::pow(2 * M_PI, z_t.size() / 2.0) * std::sqrt(Q_j.determinant());
+        w_j = std::exp(exponent) / normalizer;
     }
 
+    spdlog::debug("Weight {}", w_j);
+    
+    
+    result.weight = w_j;
+    result.z_hat = z_hat_j;
+    result.H = H_j;
+    result.Q = Q_j;
+    result.prevX = Vector2d(nearest->point[0], nearest->point[1]);
+    Matrix2d P = nearest->P;
+    result.prevP = P;
+
+    return result;
 }
 
 
 void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t) 
 {
-    size_t landmarkCount = particle.getLandmarkCount();
-    std::vector<double> weights(landmarkCount);
-    std::vector<Vector2d> z_hats(landmarkCount);
-    std::vector<Matrix2d> Hs(landmarkCount);
-    std::vector<MatrixXd> Qs(landmarkCount);
 
-    this->updateLikelihoodCorrespondence(particle, z_t, weights, z_hats, Hs, Qs);
+    auto [w, z_hat, H, Q, prevX, prevP] = this->updateLikelihoodCorrespondence(particle, z_t);
 
-    weights.push_back(p_0); // importance factor new feature    
-    size_t heaviestFeature = std::distance(weights.begin(),
-    std::max_element(weights.begin(), weights.end()));
-    particle.setWeight(weights[heaviestFeature]*particle.getWeight());
+    bool newFeature = (p_0 > w);
 
-    // Loop over both existing landmarks AND the "new landmark slot"
-    for (size_t j = 0; j <= particle.getLandmarkCount(); j++) {
+    if (newFeature) 
+    {
+        particle.setWeight(w*particle.getWeight());
+        spdlog::debug("Adding new landmark");
+        double mapX = particle.getState()[0] + z_t[0] * cos(particle.getState()[2] + z_t[1]);
+        double mapY = particle.getState()[1] + z_t[0] * sin(particle.getState()[2] + z_t[1]);
+        Vector2d mu_j_t(mapX, mapY);
+        Matrix2d H_j;
+        H_j << cos(particle.getState()[2] + z_t[1]), -z_t[0] * sin(particle.getState()[2] + z_t[1]),
+            sin(particle.getState()[2] + z_t[1]),  z_t[0] * cos(particle.getState()[2] + z_t[1]);
+        MatrixXd sigma_j_t = H_j * Q_t * H_j.transpose();
+        particle.addLandmark(Landmark(mu_j_t, sigma_j_t));
+        // particle.addSeenLandmark(j);
+    }
+    else 
+    {
+        particle.setWeight(p_0*particle.getWeight());
+        spdlog::debug("Updating landmark");
+        Landmark oldLandmark(prevX, prevP);
         
-        if (j == particle.getLandmarkCount()) {
-            // --- Handle NEW landmark hypothesis ---
-            if (heaviestFeature == j) {
-                spdlog::debug("Adding new landmark");
-                double mapX = particle.getState()[0] + z_t[0] * cos(particle.getState()[2] + z_t[1]);
-                double mapY = particle.getState()[1] + z_t[0] * sin(particle.getState()[2] + z_t[1]);
-                Vector2d mu_j_t(mapX, mapY);
-                Matrix2d H_j;
-                H_j << cos(particle.getState()[2] + z_t[1]), -z_t[0] * sin(particle.getState()[2] + z_t[1]),
-                    sin(particle.getState()[2] + z_t[1]),  z_t[0] * cos(particle.getState()[2] + z_t[1]);
-                MatrixXd sigma_j_t = H_j * Q_t * H_j.transpose();
-                particle.addLandmark(Landmark(mu_j_t, sigma_j_t, newParticleIncrease));
-                particle.addSeenLandmark(j);
-            }
-        } else {
-            // --- Handle EXISTING landmarks ---
-            if (heaviestFeature == j) {
-                spdlog::debug("Updating landmark {}", j);
-                Landmark landmark = particle.getLandmarks()[j];
-                MatrixXd K = landmark.getCovariance() * Hs[j].transpose() * Qs[j].inverse();
-                Vector2d mu_j_t = landmark.getState() + K * (z_t - z_hats[j]);
-                MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * Hs[j]) * landmark.getCovariance();
-                Landmark newLandmark(mu_j_t, sigma_j_t, landmark.getCount() + 1);
-                particle.updateLandmark(j, newLandmark);
-                particle.addSeenLandmark(j);
-            }
-        }
+        MatrixXd K = oldLandmark.P * H.transpose() * Q.inverse();
+
+        Vector2d mu_j_t = oldLandmark.x + K * (z_t - z_hat);
+
+        MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * H) * oldLandmark.P;
+        Landmark newLandmark(mu_j_t, sigma_j_t);
+
+        particle.updateLandmark(oldLandmark, newLandmark);
+        // particle.addSeenLandmark(j);
     }
 
 }
@@ -253,31 +244,31 @@ void ParticleFilter::particleWeightUpdate(std::vector<Particle>& particles, cons
         });
 }   
 
-void ParticleFilter::particlePurgeLandmarks(std::vector<Particle>& particles)
-{
-    std::for_each(std::execution::par, particles.begin(), particles.end(),
-        [&](Particle& particle) {
-            for (int j = 0; j < particle.getLandmarkCount(); j++)
-            {
-                Landmark landmark = particle.getLandmarks()[j];
-                bool inRange = landmarkInRange(particle.getState(), landmark.getState());
-                bool wasSeen = std::find(particle.getSeenLandmarks().begin(),
-                                         particle.getSeenLandmarks().end(), j) 
-                               != particle.getSeenLandmarks().end();
+// void ParticleFilter::particlePurgeLandmarks(std::vector<Particle>& particles)
+// {
+//     std::for_each(std::execution::par, particles.begin(), particles.end(),
+//         [&](Particle& particle) {
+//             for (int j = 0; j < particle.getLandmarkCount(); j++)
+//             {
+//                 Landmark landmark = particle.getLandmarks()[j];
+//                 bool inRange = landmarkInRange(particle.getState(), landmark.getState());
+//                 bool wasSeen = std::find(particle.getSeenLandmarks().begin(),
+//                                          particle.getSeenLandmarks().end(), j) 
+//                                != particle.getSeenLandmarks().end();
 
-                if ((inRange) && (!wasSeen))
-                {
-                    landmark.missedLandmark();
-                    particle.updateLandmark(j, landmark);
-                    if (particle.getLandmarks()[j].getCount() <= 0) {
-                        particle.removeLandmark(j);
-                        j--;
-                    }
-                }
-            }
-            particle.clearSeenLandmarks();
-        });
-}
+//                 if ((inRange) && (!wasSeen))
+//                 {
+//                     landmark.missedLandmark();
+//                     particle.updateLandmark(j, landmark);
+//                     if (particle.getLandmarks()[j].getCount() <= 0) {
+//                         particle.removeLandmark(j);
+//                         j--;
+//                     }
+//                 }
+//             }
+//             particle.clearSeenLandmarks();
+//         });
+// }
 
 std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Particle>& particles)
 {
