@@ -12,12 +12,12 @@ using namespace LocalizationHelpers;
 
 int main() {
     int num_landmarks = 15;
-    ParticleFilter filter(250, 10, 1);
+    ParticleFilter filter(1, 10, 1);
     std::vector<Vector2d> landmarks;
 
     // Place landmarks in a non-symmetrical L shape: 10 along x-axis (y=0), 5 along y-axis (x=0, y from 0 to 10)
-    int num_landmarks_x = 10;
-    int num_landmarks_y = 15;
+    int num_landmarks_x = 5;
+    int num_landmarks_y = 5;
     double x_min = -10.0, x_max = 10.0;
     double y_min = 0.0, y_max = 10.0;
     double dx = (num_landmarks_x > 1) ? (x_max - x_min) / (num_landmarks_x - 1) : 0.0;
@@ -51,7 +51,7 @@ int main() {
     file << "step,type,x,y,theta,particle_id,landmark_id,weight\n";  // CSV header
     
 
-    for (int step = 0; step < 500; step++) {
+    for (int step = 0; step < 3; step++) {
         double weightSum;
         filter.particleMotionUpdate(resampled, u_t);
         std::cout << "STEP " << step << " vehicle: " << vehiclePosition[0] <<"," << vehiclePosition[1] << std::endl;
@@ -76,9 +76,9 @@ int main() {
     
             Vector2d z_t(r, theta1);
 
-            if ( r <= 5.0) {
+            // if ( r <= 5.0) {
                 filter.particleWeightUpdate(resampled, z_t);
-            }
+            // }
 
             
         }
@@ -110,6 +110,7 @@ int main() {
             // }
             particle_id++;
             printKDTree(p.tree);
+            std::cout << std::endl;
             // std::cout << "particle: " << particle_id << " landmakrs: " << p.getLandmarks().size() << std::endl;
         }
 

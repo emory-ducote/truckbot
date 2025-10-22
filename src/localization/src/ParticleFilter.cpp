@@ -16,7 +16,7 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                particles(numParticles),
                                frequency(frequency),
                                newParticleIncrease(newParticleIncrease) {
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::debug);
     initialSigmas << 5.0, 5.0, 1.0;
     Q_t << 1e-2, 0, 
             0, 1e-3;
@@ -125,7 +125,7 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
     Matrix2d Q_j;
     double w_j;
     
-    if ((innovation(0) > 1.0) || (innovation(1) > 0.3)) {
+    if (std::abs((innovation(0)) > 1.0) || (std::abs(innovation(1)) > 0.3)) {
         w_j = 1e-9;
         Q_j = Matrix2d::Identity() * 10;
     }
@@ -141,7 +141,8 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
         w_j = std::exp(exponent) / normalizer;
     }
 
-    spdlog::debug("Weight {}", w_j);
+
+    spdlog::debug("Measurement:\n {}\n, Nearest:\n {}\n, Innovation:\n {}\n, Weight {}", z_t, z_hat_j, innovation, w_j);
     
     
     result.weight = w_j;
@@ -165,8 +166,8 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
 
     if (newFeature) 
     {
+        spdlog::debug("Adding new landmark {}", w);
         particle.setWeight(w*particle.getWeight());
-        spdlog::debug("Adding new landmark");
         double mapX = particle.getState()[0] + z_t[0] * cos(particle.getState()[2] + z_t[1]);
         double mapY = particle.getState()[1] + z_t[0] * sin(particle.getState()[2] + z_t[1]);
         Vector2d mu_j_t(mapX, mapY);
@@ -175,23 +176,17 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
             sin(particle.getState()[2] + z_t[1]),  z_t[0] * cos(particle.getState()[2] + z_t[1]);
         MatrixXd sigma_j_t = H_j * Q_t * H_j.transpose();
         particle.addLandmark(Landmark(mu_j_t, sigma_j_t));
-        // particle.addSeenLandmark(j);
     }
     else 
     {
+        spdlog::debug("Updating landmark {}", w);
         particle.setWeight(p_0*particle.getWeight());
-        spdlog::debug("Updating landmark");
         Landmark oldLandmark(prevX, prevP);
-        
         MatrixXd K = oldLandmark.P * H.transpose() * Q.inverse();
-
         Vector2d mu_j_t = oldLandmark.x + K * (z_t - z_hat);
-
         MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * H) * oldLandmark.P;
         Landmark newLandmark(mu_j_t, sigma_j_t);
-
         particle.updateLandmark(oldLandmark, newLandmark);
-        // particle.addSeenLandmark(j);
     }
 
 }
