@@ -46,7 +46,7 @@ class ParticleFilter {
         const double frequency;
         const double dt = 1 / frequency;
         Matrix2d Q_t; 
-        const double p_0 = 1e-2;
+        const double p_0 = 1e-8;
         const int newParticleIncrease;
         Vector3d initialSigmas;
         

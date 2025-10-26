@@ -52,12 +52,12 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       for (auto &p : resampled) {
             file << step << ",particle," << p.getState()[0] << "," << p.getState()[1] << "," << p.getState()[2] << "," << particle_id << ",," << p.getWeight() << "\n";
             // Log landmark estimates for this particle
-            // auto landmark_estimates = p.getLandmarks(); // Assumes vector<Vector2d>
-            // int landmark_id = 0;
-            // for (auto& est : landmark_estimates) {
-            //     file << step << ",particle_landmark," << est.getState()[0] << "," << est.getState()[1] << ",0," << particle_id << "," << landmark_id  << "," << p.getWeight() << "\n";
-            //     landmark_id++;
-            // }
+            auto landmark_estimates = p.getLandmarks(); // Assumes vector<Vector2d>
+            int landmark_id = 0;
+            for (auto& est : landmark_estimates) {
+                file << step << ",particle_landmark," << est[0] << "," << est[1] << ",0," << particle_id << "," << landmark_id  << "," << p.getWeight() << "\n";
+                landmark_id++;
+            }
             particle_id++;
             // std::cout << "particle: " << particle_id << " landmakrs: " << p.getLandmarks().size() << std::endl;
       }

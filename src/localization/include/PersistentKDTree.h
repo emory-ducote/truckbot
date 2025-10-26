@@ -134,7 +134,6 @@ inline std::shared_ptr<const Node> deleteNodeRec(std::shared_ptr<const Node> roo
         }
 
         // Node with children
-        std::cout << "NODE:" << root->point[0] << "," << root->point[1] << std::endl;
         if (root->right) {
             auto minNode = findMin(root->right, cd);
             double newPoint[k];
@@ -230,6 +229,13 @@ inline const Node* findNearest(std::shared_ptr<const Node> root, const double ta
     double bestDist = std::numeric_limits<double>::infinity();
     nearestNeighbor(root, target, 0, best, bestDist);
     return best;
+}
+
+inline void collectKDTreeLandmarks(std::shared_ptr<const Node> root, std::vector<Vector2d>& landmarks) {
+    if (!root) return;
+    collectKDTreeLandmarks(root->left, landmarks);
+    landmarks.emplace_back(Vector2d(root->point[0], root->point[1]));
+    collectKDTreeLandmarks(root->right, landmarks);
 }
 
 // int main()

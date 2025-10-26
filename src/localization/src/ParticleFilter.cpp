@@ -16,10 +16,12 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                particles(numParticles),
                                frequency(frequency),
                                newParticleIncrease(newParticleIncrease) {
-    spdlog::set_level(spdlog::level::debug);
+    spdlog::set_level(spdlog::level::info);
     initialSigmas << 5.0, 5.0, 1.0;
-    Q_t << 1e-2, 0, 
-            0, 1e-3;
+    // initialSigmas << 0.0, 0.0, 0.0;
+
+    Q_t << 1e-1, 0, 
+            0, 1e-2;
     for (int m = 0; m < numParticles; m++)
     {
         // Random number generator
@@ -44,7 +46,7 @@ void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    std::normal_distribution<> dist_v(0.0, 0.5);
+    std::normal_distribution<> dist_v(0.0, 0.1);
     std::normal_distribution<> dist_w(0.0, 0.5);
 
 
@@ -62,9 +64,9 @@ void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u
         theta_new = theta;
     } else {
         // Rotation + translation (unicycle model)
-        x = particle.getState()[0] + (v_t / w_t) * (std::sin(theta + w_t * dt) - std::sin(theta));
-        y = particle.getState()[1] - (v_t / w_t) * (std::cos(theta + w_t * dt) - std::cos(theta)); // <-- minus sign
-        theta_new = wrapAngle(theta + w_t * dt);
+        theta_new = (wrapAngle(theta + w_t * dt));
+        x = particle.getState()[0] + (v_t / w_t) * (std::sin(theta_new) - std::sin(theta));
+        y = particle.getState()[1] - (v_t / w_t) * (std::cos(theta_new) - std::cos(theta)); // <-- minus sign
     }
 
     particle.setState(Vector3d(x, y, theta_new));
@@ -92,12 +94,13 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
 {
     LikelihoodResult result;
 
-    double mapX = particle.getState()[0] + z_t[0] * cos(particle.getState()[2] + z_t[1]);
-    double mapY = particle.getState()[1] + z_t[0] * sin(particle.getState()[2] + z_t[1]);
+    double global_angle = wrapAngle(particle.getState()[2] + z_t[1]);
+    double mapX = particle.getState()[0] + z_t[0] * cos(global_angle);
+    double mapY = particle.getState()[1] + z_t[0] * sin(global_angle);
     double points[2] = {mapX, mapY};
     const Node * nearest = particle.searchLandmark(points);
     if (nearest == nullptr) {
-        spdlog::debug("No nearest!");
+        spdlog::debug("Measurement {} No nearest!", z_t);
         result.weight = 1e-9; 
         result.z_hat.setZero();
         result.H.setZero();
@@ -107,8 +110,8 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
         return result;
     }
     
-    double deltaX = mapX - particle.getState()[0];
-    double deltaY = mapY - particle.getState()[1];
+    double deltaX = nearest->point[0] - particle.getState()[0] + 1e-9;
+    double deltaY = nearest->point[1] - particle.getState()[1] + 1e-9;
     double q = pow(deltaX, 2) + pow(deltaY, 2);
     double r = std::sqrt(q);
     double theta = wrapAngle(atan2(deltaY, deltaX) - particle.getState()[2]);
@@ -122,10 +125,11 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
             - deltaY / q, deltaX / q;
 
     Vector2d innovation = z_t - z_hat_j;
+    innovation(1) = wrapAngle(innovation(1));
     Matrix2d Q_j;
     double w_j;
     
-    if (std::abs((innovation(0)) > 1.0) || (std::abs(innovation(1)) > 0.3)) {
+    if (std::abs(innovation(0)) > 1.0 || std::abs(innovation(1)) > 0.3) {
         w_j = 1e-9;
         Q_j = Matrix2d::Identity() * 10;
     }
@@ -135,15 +139,13 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
 
         // small perturbation may make things more stable
         Q_j += 1e-9 * Matrix2d::Identity();
-        
+
         double exponent = -0.5 * innovation.transpose() * Q_j.inverse() * innovation;
         double normalizer = std::pow(2 * M_PI, z_t.size() / 2.0) * std::sqrt(Q_j.determinant());
         w_j = std::exp(exponent) / normalizer;
     }
 
-
     spdlog::debug("Measurement:\n {}\n, Nearest:\n {}\n, Innovation:\n {}\n, Weight {}", z_t, z_hat_j, innovation, w_j);
-    
     
     result.weight = w_j;
     result.z_hat = z_hat_j;
@@ -163,13 +165,15 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
     auto [w, z_hat, H, Q, prevX, prevP] = this->updateLikelihoodCorrespondence(particle, z_t);
 
     bool newFeature = (p_0 > w);
+    spdlog::debug("New Feature {}", newFeature);
 
     if (newFeature) 
     {
         spdlog::debug("Adding new landmark {}", w);
-        particle.setWeight(w*particle.getWeight());
-        double mapX = particle.getState()[0] + z_t[0] * cos(particle.getState()[2] + z_t[1]);
-        double mapY = particle.getState()[1] + z_t[0] * sin(particle.getState()[2] + z_t[1]);
+        particle.setWeight(p_0*particle.getWeight());
+        double global_angle = wrapAngle(particle.getState()[2] + z_t[1]);
+        double mapX = particle.getState()[0] + z_t[0] * cos(global_angle);
+        double mapY = particle.getState()[1] + z_t[0] * sin(global_angle);
         Vector2d mu_j_t(mapX, mapY);
         Matrix2d H_j;
         H_j << cos(particle.getState()[2] + z_t[1]), -z_t[0] * sin(particle.getState()[2] + z_t[1]),
@@ -180,10 +184,12 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
     else 
     {
         spdlog::debug("Updating landmark {}", w);
-        particle.setWeight(p_0*particle.getWeight());
+        particle.setWeight(w*particle.getWeight());
         Landmark oldLandmark(prevX, prevP);
         MatrixXd K = oldLandmark.P * H.transpose() * Q.inverse();
-        Vector2d mu_j_t = oldLandmark.x + K * (z_t - z_hat);
+        Vector2d innovation = z_t - z_hat;
+        innovation(1) = wrapAngle(innovation(1));
+        Vector2d mu_j_t = oldLandmark.x + K * innovation;
         MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * H) * oldLandmark.P;
         Landmark newLandmark(mu_j_t, sigma_j_t);
         particle.updateLandmark(oldLandmark, newLandmark);
@@ -268,8 +274,10 @@ void ParticleFilter::particleWeightUpdate(std::vector<Particle>& particles, cons
 std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Particle>& particles)
 {
     double weightSum;
+    int resamp = 0;
     for (int p = 0; p < numParticles; p++) {
         weightSum += particles[p].getWeight();
+        spdlog::debug("Weights {}, location: {}", particles[p].getWeight(), particles[p].getState());
     }
 
     // collect and normalize weights
@@ -291,7 +299,7 @@ std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Parti
     }
 
     // Set Neff threshold (e.g., half the number of particles)
-    double neff_threshold = 0.5 * numParticles;
+    double neff_threshold = 0.2 * numParticles;
     std::vector<Particle> resampledParticles;
     if (neff < neff_threshold) {
         std::vector<int> resampledIndices = systematicResample(normalizedWeights);
@@ -317,7 +325,7 @@ std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Parti
         avg_y /= n;
         avg_theta /= n;
     }
-    // std::cout << "Average particle location after resampling: x=" << avg_x << ", y=" << avg_y << ", theta=" << avg_theta << std::endl;
+    std::cout << "Average particle location after resampling: x=" << avg_x << ", y=" << avg_y << ", theta=" << avg_theta << std::endl;
 
     return resampledParticles;
 

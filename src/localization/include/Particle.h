@@ -26,8 +26,12 @@ class Particle {
         void setCovariance(const Matrix3d newP) { P = newP; }
 
         // size_t getLandmarkCount() const { return landmarks.size(); }
-        
-        // const std::vector<Landmark> getLandmarks() { return landmarks; }
+        const std::vector<Vector2d> getLandmarks()
+        { 
+            std::vector<Vector2d> landmarks;
+            collectKDTreeLandmarks(tree, landmarks);
+            return landmarks;
+        }
         
         void removeLandmark(Landmark& landmark) 
         {
