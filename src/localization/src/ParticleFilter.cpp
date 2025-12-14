@@ -17,11 +17,11 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                frequency(frequency),
                                newParticleIncrease(newParticleIncrease) {
     spdlog::set_level(spdlog::level::info);
-    initialSigmas << 5.0, 5.0, 1.0;
+    initialSigmas << 0.5, 0.5, 0.1;
     // initialSigmas << 0.0, 0.0, 0.0;
 
-    Q_t << 1e-1, 0, 
-            0, 1e-2;
+    Q_t << 1e-1/2, 0, 
+            0, 1e-1;
     for (int m = 0; m < numParticles; m++)
     {
         // Random number generator
@@ -46,8 +46,8 @@ void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    std::normal_distribution<> dist_v(0.0, 0.1);
-    std::normal_distribution<> dist_w(0.0, 0.5);
+    std::normal_distribution<> dist_v(0.0, 0.05);
+    std::normal_distribution<> dist_w(0.0, 0.1);
 
 
     double v_t = u_t[0] + dist_v(gen);   // linear velocity (m/s)
@@ -180,6 +180,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
             sin(particle.getState()[2] + z_t[1]),  z_t[0] * cos(particle.getState()[2] + z_t[1]);
         MatrixXd sigma_j_t = H_j * Q_t * H_j.transpose();
         particle.addLandmark(Landmark(mu_j_t, sigma_j_t));
+        particle.seenLandmarks.push_back(mu_j_t);
     }
     else 
     {
@@ -193,6 +194,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
         MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * H) * oldLandmark.P;
         Landmark newLandmark(mu_j_t, sigma_j_t);
         particle.updateLandmark(oldLandmark, newLandmark);
+        particle.seenLandmarks.push_back(mu_j_t);
     }
 
 }
@@ -245,31 +247,36 @@ void ParticleFilter::particleWeightUpdate(std::vector<Particle>& particles, cons
         });
 }   
 
-// void ParticleFilter::particlePurgeLandmarks(std::vector<Particle>& particles)
-// {
-//     std::for_each(std::execution::par, particles.begin(), particles.end(),
-//         [&](Particle& particle) {
-//             for (int j = 0; j < particle.getLandmarkCount(); j++)
-//             {
-//                 Landmark landmark = particle.getLandmarks()[j];
-//                 bool inRange = landmarkInRange(particle.getState(), landmark.getState());
-//                 bool wasSeen = std::find(particle.getSeenLandmarks().begin(),
-//                                          particle.getSeenLandmarks().end(), j) 
-//                                != particle.getSeenLandmarks().end();
-
-//                 if ((inRange) && (!wasSeen))
-//                 {
-//                     landmark.missedLandmark();
-//                     particle.updateLandmark(j, landmark);
-//                     if (particle.getLandmarks()[j].getCount() <= 0) {
-//                         particle.removeLandmark(j);
-//                         j--;
-//                     }
-//                 }
-//             }
-//             particle.clearSeenLandmarks();
-//         });
-// }
+void ParticleFilter::particlePurgeLandmarks(std::vector<Particle>& particles)
+{
+    std::for_each(std::execution::par, particles.begin(), particles.end(),
+        [&](Particle& particle) {
+            std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(3.0);
+            std::vector<Vector2d>& seenLandmarks = particle.seenLandmarks;
+            std::vector<Vector2d> inRangeButNotSeen;
+            for (const auto& lm : landmarksInRange) {
+                // Check if this landmark is in seenLandmarks
+                bool seen = false;
+                for (const auto& seenLm : seenLandmarks) {
+                    if ((lm - seenLm).norm() < 1e-6) { // Use a small threshold for floating point comparison
+                        seen = true;
+                        break;
+                    }
+                }
+                if (!seen) {
+                    inRangeButNotSeen.push_back(lm);
+                }
+            }
+            for (auto& nS: inRangeButNotSeen) 
+            {
+                // std::cout << "REMOVING: " << nS << std::endl;
+                Matrix2d cov;
+                cov << 0.0, 0.0, 0.0, 0.0;
+                particle.removeLandmark(Landmark(nS, cov));
+            }
+            particle.seenLandmarks.clear();
+        });
+}
 
 std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Particle>& particles)
 {

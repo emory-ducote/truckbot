@@ -11,7 +11,7 @@ using namespace LocalizationHelpers;
 
 
 int main() {
-    ParticleFilter filter(250, 10, 1);
+    ParticleFilter filter(1, 10, 1);
     std::vector<Vector2d> landmarks;
     // Place N landmarks forming two corners at (5, 5) and (-5, 5), and a V shape at (0, -5)
     int num_landmarks = 50; // You can change this as needed
@@ -133,6 +133,8 @@ int main() {
         int particle_id = 0;
         std::cout << "TOTAL PARTICLE: " << resampled.size() << std::endl;
         for (auto &p : resampled) {
+            std::vector<Vector2d> l_i_r = p.landmarksInRange(10.0);
+            std::cout << "IN RANGE: " <<  (l_i_r.size()) << std::endl;
             file << step << ",particle," << p.getState()[0] << "," << p.getState()[1] << "," << p.getState()[2] << "," << particle_id << ",," << p.getWeight() << "\n";
             // Log landmark estimates for this particle
             auto landmark_estimates = p.getLandmarks(); // Assumes vector<Vector2d>

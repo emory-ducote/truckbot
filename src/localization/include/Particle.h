@@ -33,7 +33,7 @@ class Particle {
             return landmarks;
         }
         
-        void removeLandmark(Landmark& landmark) 
+        void removeLandmark(const Landmark& landmark) 
         {
             Vector2d point = landmark.x;
             double points[2] = {point(0), point(1)};
@@ -60,6 +60,14 @@ class Particle {
             return best;
         }
 
+        std::vector<Vector2d> landmarksInRange(float range)
+        {
+            std::vector<Vector2d> nearbyLandmarks;
+            double target[2] = {x(0), x(1)};
+            findNodesWithinThreshold(tree, target, range, nearbyLandmarks);
+            return nearbyLandmarks;
+        }
+
         double getWeight() const { return weight; }
 
         void setWeight(double newWeight) { weight = newWeight; }
@@ -70,11 +78,11 @@ class Particle {
 
         // void clearSeenLandmarks() { seenLandmarks.clear(); }
         std::shared_ptr<const Node> tree = nullptr;
+        std::vector<Vector2d> seenLandmarks;
     private:
         Vector3d x;
         Matrix3d P;
         // std::vector<Landmark> landmarks;
-        // std::vector<int> seenLandmarks;
         double weight = 1.0;
 };
 

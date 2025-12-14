@@ -238,9 +238,48 @@ inline void collectKDTreeLandmarks(std::shared_ptr<const Node> root, std::vector
     collectKDTreeLandmarks(root->right, landmarks);
 }
 
+inline void findNodesWithinThreshold(
+    std::shared_ptr<const Node> root,
+    const double target[k],
+    double threshold,
+    std::vector<Vector2d>& results,
+    double target_theta = 0.0, // orientation in radians
+    double angle_swath = M_PI, // swath in radians (default 180 deg)
+    int depth = 0)
+{
+    if (!root) return;
+
+    double dist = std::sqrt(distanceSquared(root->point, target));
+    if (dist <= threshold) {
+        // Angle filtering
+        double dx = root->point[0] - target[0];
+        double dy = root->point[1] - target[1];
+        double bearing = std::atan2(dy, dx); // global bearing to point
+        double rel_angle = bearing - target_theta;
+        // Normalize to [-pi, pi]
+        while (rel_angle > M_PI) rel_angle -= 2 * M_PI;
+        while (rel_angle < -M_PI) rel_angle += 2 * M_PI;
+        if (std::abs(rel_angle) <= angle_swath / 2.0) {
+            results.emplace_back(Vector2d(root->point[0], root->point[1]));
+        }
+    }
+
+    int cd = depth % k;
+    double diff = target[cd] - root->point[cd];
+
+    // Search left subtree if it could contain points within threshold
+    if (diff <= 0 || std::abs(diff) < threshold) {
+        findNodesWithinThreshold(root->left, target, threshold, results, target_theta, angle_swath, depth + 1);
+    }
+    // Search right subtree if it could contain points within threshold
+    if (diff >= 0 || std::abs(diff) < threshold) {
+        findNodesWithinThreshold(root->right, target, threshold, results, target_theta, angle_swath, depth + 1);
+    }
+}
+
 // int main()
 // {
-//     int points[][k] = {{30, 40}, {5, 25}, {70, 70},
+//     double points[][k] = {{30, 40}, {5, 25}, {70, 70},
 //                         {10, 12}, {50, 30}, {35, 45}};
 //     std::shared_ptr<const Node> root = nullptr;
 
