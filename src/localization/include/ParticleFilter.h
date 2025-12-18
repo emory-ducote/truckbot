@@ -15,7 +15,6 @@ using namespace Eigen;
 class ParticleFilter {
     public:
         ParticleFilter(const int numParticles = 100, 
-                       const double frequency = 20,
                        const int newParticleIncrease = 1);
         ~ParticleFilter();
 
@@ -35,16 +34,13 @@ class ParticleFilter {
         LikelihoodResult updateLikelihoodCorrespondence(Particle& particle, const Vector2d& z_t);
         void landmarkUpdate(Particle& particle, const Vector2d& z_t);
         std::vector<int> systematicResample(const std::vector<double>& weights);
-        void particleMotionUpdate(std::vector<Particle>& particles, const Vector2d& u_t);
+        void particleMotionUpdate(std::vector<Particle>& particles, const Vector2d& u_t, double dt);
         void particleWeightUpdate(std::vector<Particle>& particles, const Vector2d& z_t);
         void particlePurgeLandmarks(std::vector<Particle>& particles);
         std::vector<Particle> particleWeightResampling(std::vector<Particle>& particles);
     private:
         const int numParticles;
         std::vector<Particle> particles;
-
-        const double frequency;
-        const double dt = 1 / frequency;
         Matrix2d Q_t; 
         const double p_0 = 1e-8;
         const int newParticleIncrease;

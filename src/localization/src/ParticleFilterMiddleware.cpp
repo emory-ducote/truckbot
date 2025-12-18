@@ -4,6 +4,9 @@
 #include "ParticleFilter.h"
 #include <fstream>
 
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+
 
 std::ofstream file("particles_log.csv");
 
@@ -11,6 +14,7 @@ using namespace LocalizationHelpers;
 
 class ParticleFilterMiddleware : public rclcpp::Node {
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr landmark_pub_;
+    std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_broadcaster_;
   public:
     ParticleFilterMiddleware(std::shared_ptr<ParticleFilter> particleFilter) : 
                               Node("particle_filter_middleware"),
@@ -28,19 +32,50 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       step = 0;
 
       file << "step,type,x,y,theta,particle_id,landmark_id,weight\n";  // CSV header
+      // Initialize static transform broadcaster
+      static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+
                                                                       
     }
+    double prev_time = 0;
   
   private:
+    void publishHeaviestParticleTransform(const Particle& heaviest)
+    {
+      geometry_msgs::msg::TransformStamped tf_msg;
+      tf_msg.header.stamp = this->now();
+      tf_msg.header.frame_id = "map";
+      tf_msg.child_frame_id = "laser";
+      tf_msg.transform.translation.x = heaviest.x[0];
+      tf_msg.transform.translation.y = heaviest.x[1];
+      tf_msg.transform.translation.z = 0.0;
+      double theta = heaviest.x[2] + M_PI;
+      tf_msg.transform.rotation.x = 0.0;
+      tf_msg.transform.rotation.y = 0.0;
+      tf_msg.transform.rotation.z = sin(theta/2.0);
+      tf_msg.transform.rotation.w = cos(theta/2.0);
+      static_broadcaster_->sendTransform(tf_msg);
+    }
     void clusterCallback(const visualization_msgs::msg::MarkerArray::SharedPtr msg)
     {
-      particleFilter->particleMotionUpdate(resampled, u_t);
+      double timestamp;
+      if (!msg->markers.empty()) {
+          timestamp = msg->markers[0].header.stamp.sec + 1e-9 * msg->markers[0].header.stamp.nanosec;
+          // use timestamp
+      }
+      else {
+        return;
+      }
+      double dt = timestamp - prev_time;
+      std::cout << "DT: " << dt << std::endl;
+      prev_time = timestamp;
+      particleFilter->particleMotionUpdate(resampled, u_t, dt);
       for (const auto& marker : msg->markers)
       {
         double q = pow(marker.pose.position.x, 2) + pow(marker.pose.position.y, 2);
         double r = std::sqrt(q);
         double theta1 = wrapAngle(atan2(marker.pose.position.y, marker.pose.position.x) + M_PI);
-        if (r <= 3.0) {
+        if (r <= 5.0) {
 
         Vector2d z_t(r, theta1);
         particleFilter->particleWeightUpdate(resampled, z_t);
@@ -55,10 +90,12 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       // Find the heaviest weighted particle
       if (!resampled.empty()) {
         auto max_it = std::max_element(resampled.begin(), resampled.end(), [](const Particle& a, const Particle& b) {
-          return a.getWeight() < b.getWeight();
+          return a.weight < b.weight;
         });
         if (max_it != resampled.end()) {
           Particle& heaviest = *max_it;
+          // Publish the transform from map to laser as the heaviest particle pose
+          publishHeaviestParticleTransform(heaviest);
           auto landmarks = heaviest.getLandmarks(); // Assumes vector<Vector2d>
           visualization_msgs::msg::MarkerArray landmark_markers;
           int landmark_id = 0;
@@ -77,9 +114,9 @@ class ParticleFilterMiddleware : public rclcpp::Node {
             marker.pose.orientation.y = 0.0;
             marker.pose.orientation.z = 0.0;
             marker.pose.orientation.w = 1.0;
-            marker.scale.x = 0.2;
-            marker.scale.y = 0.2;
-            marker.scale.z = 0.2;
+            marker.scale.x = 0.05;
+            marker.scale.y = 0.05;
+            marker.scale.z = 0.05;
             marker.color.a = 1.0;
             marker.color.r = 0.0;
             marker.color.g = 1.0;
@@ -90,15 +127,15 @@ class ParticleFilterMiddleware : public rclcpp::Node {
         }
       }
       
-      int particle_id = 0;
+      // int particle_id = 0;
       // for (auto &p : resampled) {
       //       p.landmarksInRange(3.0);
-      //       file << step << ",particle," << p.getState()[0] << "," << p.getState()[1] << "," << p.getState()[2] << "," << particle_id << ",," << p.getWeight() << "\n";
+      //       file << step << ",particle," << p.x[0] << "," << p.x[1] << "," << p.x[2] << "," << particle_id << ",," << p.weight << "\n";
       //       // Log landmark estimates for this particle
       //       auto landmark_estimates = p.getLandmarks(); // Assumes vector<Vector2d>
       //       int landmark_id = 0;
       //       for (auto& est : landmark_estimates) {
-      //           file << step << ",particle_landmark," << est[0] << "," << est[1] << ",0," << particle_id << "," << landmark_id  << "," << p.getWeight() << "\n";
+      //           file << step << ",particle_landmark," << est[0] << "," << est[1] << ",0," << particle_id << "," << landmark_id  << "," << p.weight << "\n";
       //           landmark_id++;
       //       }
       //       particle_id++;
@@ -121,6 +158,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     std::vector<Particle> resampled;
     Vector2d u_t;
     int step;
+
 
 };
 
@@ -164,7 +202,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
-    auto particleFilter = std::make_shared<ParticleFilter>(10, 7, 1);
+    auto particleFilter = std::make_shared<ParticleFilter>(50, 1);
     rclcpp::spin(std::make_shared<ParticleFilterMiddleware>(particleFilter));
     rclcpp::shutdown();
     file.close();

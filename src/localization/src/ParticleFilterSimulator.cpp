@@ -11,13 +11,13 @@ using namespace LocalizationHelpers;
 
 
 int main() {
-    ParticleFilter filter(1, 10, 1);
+    ParticleFilter filter(1, 1);
     std::vector<Vector2d> landmarks;
     // Place N landmarks forming two corners at (5, 5) and (-5, 5), and a V shape at (0, -5)
     int num_landmarks = 50; // You can change this as needed
     int quarter = num_landmarks / 4;
     int half = num_landmarks / 2;
-    int eighth = num_landmarks / 8;
+    // int eighth = num_landmarks / 8;
     int v_count = num_landmarks / 4; // Number of points for the V shape
     // First quarter: vertical line at x=5, y from 0 to 5
     for (int i = 0; i < quarter; ++i) {
@@ -80,7 +80,6 @@ int main() {
     
 
     for (int step = 0; step < 50; step++) {
-        double weightSum;
         std::cout << "STEP " << step << " vehicle: " << vehiclePosition[0] <<"," << vehiclePosition[1] << std::endl;
         if (step % 8) {
             u_t(1) = 0.1;
@@ -91,9 +90,9 @@ int main() {
         if (step % 5) {
             u_t(1) = -0.3;
         }
-        filter.particleMotionUpdate(resampled, u_t);
+        filter.particleMotionUpdate(resampled, u_t, 0.05);
         bool resample = false;
-        for (int j = 0; j < landmarks.size(); j++) {
+        for (size_t j = 0; j < landmarks.size(); j++) {
             double deltaX = landmarks[j][0] - vehiclePosition[0];
             double deltaY = landmarks[j][1] - vehiclePosition[1];
             double q = pow(deltaX, 2) + pow(deltaY, 2);
@@ -135,12 +134,12 @@ int main() {
         for (auto &p : resampled) {
             std::vector<Vector2d> l_i_r = p.landmarksInRange(10.0);
             std::cout << "IN RANGE: " <<  (l_i_r.size()) << std::endl;
-            file << step << ",particle," << p.getState()[0] << "," << p.getState()[1] << "," << p.getState()[2] << "," << particle_id << ",," << p.getWeight() << "\n";
+            file << step << ",particle," << p.x[0] << "," << p.x[1] << "," << p.x[2] << "," << particle_id << ",," << p.weight << "\n";
             // Log landmark estimates for this particle
             auto landmark_estimates = p.getLandmarks(); // Assumes vector<Vector2d>
             int landmark_id = 0;
             for (auto& est : landmark_estimates) {
-                file << step << ",particle_landmark," << est[0] << "," << est[1] << ",0," << particle_id << "," << landmark_id  << "," << p.getWeight() << "\n";
+                file << step << ",particle_landmark," << est[0] << "," << est[1] << ",0," << particle_id << "," << landmark_id  << "," << p.weight << "\n";
                 landmark_id++;
             }
             particle_id++;
@@ -153,7 +152,7 @@ int main() {
         file << step << ",vehicle," << vehiclePosition[0] << "," << vehiclePosition[1] << "," << vehiclePosition[2] << ",,," << "\n";
 
         // Log landmark (no theta)
-        for (int j = 0; j < landmarks.size(); j++) {
+        for (size_t j = 0; j < landmarks.size(); j++) {
         file << step << ",true_landmark," << landmarks[j][0] << "," << landmarks[j][1] << ",0,,0,\n";
         }
         // std::cout << "-----------------------------------------------------------------" << std::endl;

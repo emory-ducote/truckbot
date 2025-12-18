@@ -84,7 +84,7 @@ inline std::shared_ptr<const Node> findMinRec(std::shared_ptr<const Node> root,
         return nullptr;
     }
 
-    unsigned cd = depth % k;
+    int cd = depth % k;
     if (cd == d) {
         if (!root->left) {
             return root;

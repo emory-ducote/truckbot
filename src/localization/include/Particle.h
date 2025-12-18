@@ -1,6 +1,4 @@
-#ifndef PARTICLE_H_
-#define PARTICLE_H_
-
+#pragma once
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include "Landmark.h"
@@ -8,24 +6,12 @@
 
 using namespace Eigen;
 
-class Particle {
-    public:
+struct Particle {
         Particle(Vector3d x=Vector3d::Zero(),
                  Matrix3d P=Matrix3d::Identity(3, 3) * 1e-3) :
                  x(x),
                  P(P) {};
 
-        ~Particle() = default;
-
-        const Vector3d& getState() { return x; }
-        
-        void setState(const Vector3d newX) { x = newX; }
-        
-        const Matrix3d& getCovariance() { return P; }
-
-        void setCovariance(const Matrix3d newP) { P = newP; }
-
-        // size_t getLandmarkCount() const { return landmarks.size(); }
         const std::vector<Vector2d> getLandmarks()
         { 
             std::vector<Vector2d> landmarks;
@@ -38,7 +24,6 @@ class Particle {
             Vector2d point = landmark.x;
             double points[2] = {point(0), point(1)};
             tree = deleteNode(tree, points);
-            // landmarks.erase(landmarks.begin() + index);
         }
 
         void addLandmark(const Landmark& landmark) { 
@@ -64,26 +49,19 @@ class Particle {
         {
             std::vector<Vector2d> nearbyLandmarks;
             double target[2] = {x(0), x(1)};
-            findNodesWithinThreshold(tree, target, range, nearbyLandmarks);
+            findNodesWithinThreshold(tree, 
+                                     target, 
+                                     range, 
+                                     nearbyLandmarks, 
+                                     x(2), 
+                                     M_PI, // swath in radians (default 180 deg)
+                                     0);
             return nearbyLandmarks;
         }
 
-        double getWeight() const { return weight; }
-
-        void setWeight(double newWeight) { weight = newWeight; }
-
-        // std::vector<int>& getSeenLandmarks() { return seenLandmarks; }
-
-        // void addSeenLandmark(const int index) { seenLandmarks.push_back(index) ; }
-
-        // void clearSeenLandmarks() { seenLandmarks.clear(); }
         std::shared_ptr<const Node> tree = nullptr;
         std::vector<Vector2d> seenLandmarks;
-    private:
         Vector3d x;
         Matrix3d P;
-        // std::vector<Landmark> landmarks;
         double weight = 1.0;
 };
-
-#endif

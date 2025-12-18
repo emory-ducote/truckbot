@@ -19,8 +19,7 @@ find_package(visualization_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(TBB REQUIRED)
-
-
+find_package(tf2_ros REQUIRED)
 
 include_directories(
   include
@@ -40,7 +39,7 @@ add_executable(particle_filter
 )
 
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
-ament_target_dependencies(particle_filter rclcpp visualization_msgs)
+ament_target_dependencies(particle_filter rclcpp visualization_msgs tf2_ros)
 
 add_executable(particle_filter_simulator
   src/ParticleFilterSimulator.cpp
