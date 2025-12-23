@@ -20,17 +20,21 @@ INCLUDE_DIRECTORIES(
   include
 )
 
-add_executable(imu
-  src/IMUMiddleware.cpp
-  src/rpi5ICM20948.cpp
-)
+# Only compile on ARM architecture
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  add_executable(imu
+    src/IMUMiddleware.cpp
+    src/rpi5ICM20948.cpp
+  )
 
-target_link_libraries(imu lgpio Eigen3::Eigen)
-ament_target_dependencies(imu rclcpp sensor_msgs)
+  target_link_libraries(imu lgpio Eigen3::Eigen)
+  ament_target_dependencies(imu rclcpp sensor_msgs)
 
-
-install(TARGETS
-  imu
-  DESTINATION lib/${PROJECT_NAME})
+  install(TARGETS
+    imu
+    DESTINATION lib/${PROJECT_NAME})
+else()
+  message(STATUS "Skipping imu target: not on ARM architecture (detected: ${CMAKE_SYSTEM_PROCESSOR})")
+endif()
 
 ament_package()

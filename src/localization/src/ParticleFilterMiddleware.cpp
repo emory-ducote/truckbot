@@ -185,8 +185,8 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     }
 
     void controlCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
-    u_t(0) = msg->linear.x*1.5;
     {
+      u_t(0) = msg->linear.x;
       u_t(1) = msg->angular.z;
     }
 
