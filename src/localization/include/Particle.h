@@ -19,9 +19,8 @@ struct Particle {
             return landmarks;
         }
         
-        void removeLandmark(const Landmark& landmark) 
+        void removeLandmark(const Vector2d& point) 
         {
-            Vector2d point = landmark.x;
             double points[2] = {point(0), point(1)};
             tree = deleteNode(tree, points);
         }
@@ -35,7 +34,7 @@ struct Particle {
 
         void updateLandmark(Landmark& oldLandmark, Landmark& newLandmark) 
         {
-            removeLandmark(oldLandmark);
+            removeLandmark(oldLandmark.x);
             addLandmark(newLandmark);
         }
 
@@ -45,16 +44,16 @@ struct Particle {
             return best;
         }
 
-        std::vector<Vector2d> landmarksInRange(float range)
+        std::vector<Vector2d> landmarksInRange(const double maxRange, const double maxAngle)
         {
             std::vector<Vector2d> nearbyLandmarks;
             double target[2] = {x(0), x(1)};
             findNodesWithinThreshold(tree, 
                                      target, 
-                                     range, 
+                                     maxRange, 
                                      nearbyLandmarks, 
                                      x(2), 
-                                     M_PI, // swath in radians (default 180 deg)
+                                     maxAngle, // swath in radians (default 180 deg)
                                      0);
             return nearbyLandmarks;
         }

@@ -41,18 +41,26 @@ add_executable(particle_filter
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
 ament_target_dependencies(particle_filter rclcpp visualization_msgs tf2_ros)
 
-add_executable(particle_filter_simulator
-  src/ParticleFilterSimulator.cpp
-  src/ParticleFilter.cpp
-)
+# add_executable(particle_filter_simulator
+#   src/ParticleFilterSimulator.cpp
+#   src/ParticleFilter.cpp
+# )
 
-target_link_libraries(particle_filter_simulator Eigen3::Eigen fmt::fmt TBB::tbb)
-ament_target_dependencies(particle_filter_simulator rclcpp)
+# target_link_libraries(particle_filter_simulator Eigen3::Eigen fmt::fmt TBB::tbb)
+# ament_target_dependencies(particle_filter_simulator rclcpp)
 
 install(TARGETS
   ekf
   particle_filter
-  particle_filter_simulator
+  # particle_filter_simulator
   DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config
+)
 
 ament_package()

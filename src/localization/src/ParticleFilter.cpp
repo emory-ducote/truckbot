@@ -2,27 +2,45 @@
 #include <random>
 #include <iostream>
 #include <spdlog/spdlog.h>
-#include "spdlog/fmt/ostr.h"
 #include <execution>
+#include "spdlog/fmt/ostr.h"
 #include "ParticleFilter.h"
 
 using namespace LocalizationHelpers;
 
 
 ParticleFilter::ParticleFilter(const int numParticles, 
-                               const int newParticleIncrease) : 
+                               const int newParticleIncrease,
+                               const double maxRange,
+                               const double maxAngle,
+                               const double newParticleThreshold,
+                               const double neffThreshold,
+                               const double measurementNoiseRange,
+                               const double measurementNoiseBearing,
+                               const double linearVelocityAlpha1,
+                               const double linearVelocityAlpha2,
+                               const double angularVelocityAlpha1,
+                               const double angularVelocityAlpha2) : 
                                numParticles(numParticles),
                                particles(numParticles),
-                               newParticleIncrease(newParticleIncrease) {
-    spdlog::set_level(spdlog::level::info);
-    initialSigmas << 0.5, 0.5, 0.1;
-    // initialSigmas << 0.0, 0.0, 0.0;
+                               newParticleIncrease(newParticleIncrease),
+                               maxRange(maxRange),
+                               maxAngle(maxAngle),
+                               newParticleThreshold(newParticleThreshold),
+                               neffThreshold(neffThreshold),
+                               measurementNoiseRange(measurementNoiseRange),
+                               measurementNoiseBearing(measurementNoiseBearing),
+                               linearVelocityAlpha1(linearVelocityAlpha1),
+                               linearVelocityAlpha2(linearVelocityAlpha2),
+                               angularVelocityAlpha1(angularVelocityAlpha1),
+                               angularVelocityAlpha2(angularVelocityAlpha2) {
+    spdlog::set_level(spdlog::level::debug);
+    initialSigmas << 0.0, 0.0, 0.0;
 
-    Q_t << 1e-1, 0, 
-            0, 1e-2;
+    Q_t << measurementNoiseRange, 0, 
+           0, measurementNoiseBearing;
     for (int m = 0; m < numParticles; m++)
     {
-        // Random number generator
         std::random_device rd;
         std::mt19937 gen(rd());
 
@@ -30,68 +48,51 @@ ParticleFilter::ParticleFilter(const int numParticles,
         std::normal_distribution<> dist_y(0.0, initialSigmas[1]);
         std::normal_distribution<> dist_theta(0.0, initialSigmas[2]);
 
-        // Add noise
-
         Vector3d noisy_state(dist_x(gen), dist_y(gen), dist_theta(gen));
+
         particles[m] = Particle(noisy_state);
     }
+
 }
 
 ParticleFilter::~ParticleFilter(){}
 
-void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u_t, double dt) 
+void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u_t, const double dt) 
 {
     std::random_device rd;
     std::mt19937 gen(rd());
+    std::normal_distribution<> standardNormal(0.0, 1.0);
 
-    std::normal_distribution<> dist_v(0.0, 0.5);
-    std::normal_distribution<> dist_w(0.0, 0.05);
-
-
-    double v_t = u_t[0] + dist_v(gen);   // linear velocity (m/s)
-    double w_t = u_t[1] + dist_w(gen);   // angular velocity (rad/s)
+    double linearVelocity = u_t[0];     // control input linear velocity (m/s)
+    double angularVelocity = u_t[1];    // control input angular velocity (rad/s)
+    
+    // Apply 4-alpha noise model
+    double linearVelStd = std::sqrt(linearVelocityAlpha1 * std::abs(linearVelocity) + linearVelocityAlpha2 * std::abs(angularVelocity));
+    double angularVelStd = std::sqrt(angularVelocityAlpha1 * std::abs(linearVelocity) + angularVelocityAlpha2 * std::abs(angularVelocity));
+    
+    double noisyLinearVel = linearVelocity + linearVelStd * standardNormal(gen);
+    double noisyAngularVel = angularVelocity + angularVelStd * standardNormal(gen);
+    
     double theta = particle.x[2];
-
     double x, y, theta_new;
 
-
-    if (std::abs(w_t) < 1e-6) {
+    if (std::abs(noisyAngularVel) < 1e-6) {
         // Straight line motion
-        x = particle.x[0] + v_t * dt * std::cos(theta);
-        y = particle.x[1] + v_t * dt * std::sin(theta);
+        x = particle.x[0] + noisyLinearVel * dt * std::cos(theta);
+        y = particle.x[1] + noisyLinearVel * dt * std::sin(theta);
         theta_new = theta;
     } else {
         // Rotation + translation (unicycle model)
-        theta_new = (wrapAngle(theta + w_t * dt));
-        x = particle.x[0] + (v_t / w_t) * (std::sin(theta_new) - std::sin(theta));
-        y = particle.x[1] - (v_t / w_t) * (std::cos(theta_new) - std::cos(theta)); // <-- minus sign
+        theta_new = (wrapAngle(theta + noisyAngularVel * dt));
+        x = particle.x[0] + (noisyLinearVel / noisyAngularVel) * (std::sin(theta_new) - std::sin(theta));
+        y = particle.x[1] - (noisyLinearVel / noisyAngularVel) * (std::cos(theta_new) - std::cos(theta)); 
     }
-
-    particle.x = (Vector3d(x, y, theta_new));
-}
-
-
-
-bool ParticleFilter::landmarkInRange(const Vector3d& state, const Vector2d& landmarkState)
-{
-    const double maxRange = 5.0;
-    const double maxAngle = 180.0 * M_PI / 180.0; // radians
-
-    double dx = landmarkState[0] - state[0];
-    double dy = landmarkState[1] - state[1];
-    double r = std::sqrt(dx * dx + dy * dy);
-    if (r > maxRange) return false;
-
-    double bearing_global = std::atan2(dy, dx);
-    double relative_bearing = wrapAngle(bearing_global - state[2]);
-
-    return (std::abs(relative_bearing) <= maxAngle);
+    particle.x = Vector3d(x, y, theta_new);
 }
 
 ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(Particle& particle, const Vector2d& z_t)
 {
     LikelihoodResult result;
-
     double global_angle = wrapAngle(particle.x[2] + z_t[1]);
     double mapX = particle.x[0] + z_t[0] * cos(global_angle);
     double mapY = particle.x[1] + z_t[0] * sin(global_angle);
@@ -142,8 +143,6 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
         double normalizer = std::pow(2 * M_PI, z_t.size() / 2.0) * std::sqrt(Q_j.determinant());
         w_j = std::exp(exponent) / normalizer;
     }
-
-    spdlog::debug("Measurement:\n {}\n, Nearest:\n {}\n, Innovation:\n {}\n, Weight {}", z_t, z_hat_j, innovation, w_j);
     
     result.weight = w_j;
     result.z_hat = z_hat_j;
@@ -162,13 +161,12 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
 
     auto [w, z_hat, H, Q, prevX, prevP] = this->updateLikelihoodCorrespondence(particle, z_t);
 
-    bool newFeature = (p_0 > w);
-    spdlog::debug("New Feature {}", newFeature);
+    bool newFeature = (newParticleThreshold > w);
+    // spdlog::debug("New Feature {}", newFeature);
 
     if (newFeature) 
     {
-        spdlog::debug("Adding new landmark {}", w);
-        particle.weight = p_0*particle.weight;
+        particle.weight = newParticleThreshold*particle.weight;
         double global_angle = wrapAngle(particle.x[2] + z_t[1]);
         double mapX = particle.x[0] + z_t[0] * cos(global_angle);
         double mapY = particle.x[1] + z_t[0] * sin(global_angle);
@@ -182,7 +180,6 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
     }
     else 
     {
-        spdlog::debug("Updating landmark {}", w);
         particle.weight = w*particle.weight;
         Landmark oldLandmark(prevX, prevP);
         MatrixXd K = oldLandmark.P * H.transpose() * Q.inverse();
@@ -227,36 +224,33 @@ std::vector<int> ParticleFilter::systematicResample(const std::vector<double>& w
     return indexes;
 }
 
-void ParticleFilter::particleMotionUpdate(std::vector<Particle>& particles, const Vector2d& u_t, double dt)
+void ParticleFilter::particleMotionUpdate(const Vector2d& u_t, const double dt)
 {
-     // update particle poses in parallel
     std::for_each(std::execution::par, particles.begin(), particles.end(),
         [&](Particle& particle) {
             this->sampleNewParticlePose(particle, u_t, dt);
         });
 }
 
-void ParticleFilter::particleWeightUpdate(std::vector<Particle>& particles, const Vector2d& z_t)
+void ParticleFilter::particleWeightUpdate(const Vector2d& z_t)
 {
-    // main landmark update and weight sum in parallel
     std::for_each(std::execution::par, particles.begin(), particles.end(),
         [&](Particle& particle) {
             this->landmarkUpdate(particle, z_t);
         });
 }   
 
-void ParticleFilter::particlePurgeLandmarks(std::vector<Particle>& particles)
+void ParticleFilter::particlePurgeLandmarks()
 {
     std::for_each(std::execution::par, particles.begin(), particles.end(),
         [&](Particle& particle) {
-            std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(5.0);
+            std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(maxRange, maxAngle);
             std::vector<Vector2d>& seenLandmarks = particle.seenLandmarks;
             std::vector<Vector2d> inRangeButNotSeen;
             for (const auto& lm : landmarksInRange) {
-                // Check if this landmark is in seenLandmarks
                 bool seen = false;
                 for (const auto& seenLm : seenLandmarks) {
-                    if ((lm - seenLm).norm() < 1e-6) { // Use a small threshold for floating point comparison
+                    if ((lm - seenLm).norm() < 1e-6) { 
                         seen = true;
                         break;
                     }
@@ -267,21 +261,19 @@ void ParticleFilter::particlePurgeLandmarks(std::vector<Particle>& particles)
             }
             for (auto& nS: inRangeButNotSeen) 
             {
-                // std::cout << "REMOVING: " << nS << std::endl;
-                Matrix2d cov;
-                cov << 0.0, 0.0, 0.0, 0.0;
-                particle.removeLandmark(Landmark(nS, cov));
+                particle.removeLandmark(nS);
             }
             particle.seenLandmarks.clear();
         });
 }
 
-std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Particle>& particles)
+std::vector<Particle> ParticleFilter::particleWeightResampling()
 {
+    spdlog::debug("Started Resampling");
+
     double weightSum;
     for (int p = 0; p < numParticles; p++) {
         weightSum += particles[p].weight;
-        spdlog::debug("Weights {}, location: {}", particles[p].weight, particles[p].x);
     }
 
     // collect and normalize weights
@@ -302,39 +294,54 @@ std::vector<Particle> ParticleFilter::particleWeightResampling(std::vector<Parti
         neff = 0.0;
     }
 
+    spdlog::info("NEFF: {}", neff);
+
+    spdlog::debug("Started Resampling");
+
+
     // Set Neff threshold (e.g., half the number of particles)
-    double neff_threshold = 0.2 * numParticles;
+    double neff_threshold = neffThreshold * numParticles;
     std::vector<Particle> resampledParticles;
     if (neff < neff_threshold) {
+        spdlog::debug("NEFF BELOW THRESHOLD");
         std::vector<int> resampledIndices = systematicResample(normalizedWeights);
+        spdlog::debug("SYSTEMATIC RESAMPLED");
         resampledParticles.resize(numParticles);
+        spdlog::debug("RESIZED");
         for (int m = 0; m < numParticles; m++) {
+            spdlog::debug("ABOUT TO RESAMPLE {}", m);
+            spdlog::debug("PICKED: {}", particles[resampledIndices[m]].x);
             resampledParticles[m] = particles[resampledIndices[m]];
+            spdlog::debug("RESAMPLED {}", m);
         }
+
     } else {
         // No resampling, just return current particles
         resampledParticles = particles;
     }
 
-    // Compute average particle location after resampling
-    double avg_x = 0.0, avg_y = 0.0, avg_theta = 0.0;
-    for (auto& p : resampledParticles) {
-        avg_x += p.x[0];
-        avg_y += p.x[1];
-        avg_theta += p.x[2];
-    }
-    int n = resampledParticles.size();
-    if (n > 0) {
-        avg_x /= n;
-        avg_y /= n;
-        avg_theta /= n;
-    }
-    std::cout << "Average particle location after resampling: x=" << avg_x << ", y=" << avg_y << ", theta=" << avg_theta << std::endl;
+    particles = resampledParticles;
 
-    return resampledParticles;
+
+    spdlog::debug("Started Resampling");
+
+    return particles;
 
 }
     
-
-
-
+std::vector<Particle> ParticleFilter::particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt)
+{
+    spdlog::debug("Loop Start");
+    particleMotionUpdate(u_t, dt);
+    spdlog::debug("Motion Updated");
+    for (const auto& z_t: z_t_s)
+    {
+        if (z_t(0) <= maxRange) {
+            particleWeightUpdate(z_t);
+        }
+    }
+    spdlog::debug("Measurements Updated");
+    particlePurgeLandmarks();
+    spdlog::debug("Landmarks Purged");
+    return particleWeightResampling();
+}
