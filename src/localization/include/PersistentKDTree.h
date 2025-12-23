@@ -1,0 +1,304 @@
+#pragma once
+#include <memory>
+#include <algorithm>
+#include <limits>
+#include <climits>
+#include <iostream>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
+
+using namespace Eigen;
+
+const int k = 2;
+
+struct Node {
+    double point[k];
+    Matrix2d P;
+    std::shared_ptr<const Node> left;
+    std::shared_ptr<const Node> right;
+
+    Node(const double arr[k],
+         Matrix2d P,
+         std::shared_ptr<const Node> L = nullptr,
+         std::shared_ptr<const Node> R = nullptr)
+        : P(P), left(L), right(R)
+    {
+        for (int i = 0; i < k; i++)
+            point[i] = arr[i];
+    }
+};
+
+
+inline std::shared_ptr<const Node> insertRec(std::shared_ptr<const Node> root, 
+                                      double point[], 
+                                      Matrix2d P,
+                                      unsigned depth)
+{
+    // Tree is empty?
+    if (root == nullptr) {
+        return std::make_shared<const Node>(point, P);
+    }
+
+    // Calculate current dimension (cd) of comparison
+    unsigned cd = depth % k;
+
+    // Compare the new point with root on current dimension 'cd'
+    // and decide the left or right subtree
+    if (point[cd] < (root->point[cd])) {
+        auto newLeft = insertRec(root->left, point, P, depth + 1);
+        return std::make_shared<const Node>(root->point, root->P, newLeft, root->right);
+    }
+    else {
+        auto newRight = insertRec(root->right, point, P, depth + 1);
+        return std::make_shared<const Node>(root->point, root->P, root->left, newRight);
+    }
+
+    return root;
+}
+
+inline std::shared_ptr<const Node> insert(std::shared_ptr<const Node> root,
+                                   double point[],
+                                   Matrix2d P)
+{
+    return insertRec(root, point, P, 0);
+}
+
+inline std::shared_ptr<const Node> minNode(std::shared_ptr<const Node> x, 
+                                    std::shared_ptr<const Node> y, 
+                                    std::shared_ptr<const Node> z, 
+                                    int d)
+{
+    std::shared_ptr<const Node> res = x;
+    if (y != NULL && y->point[d] < res->point[d])
+       res = y;
+    if (z != NULL && z->point[d] < res->point[d])
+       res = z;
+    return res;
+}
+
+inline std::shared_ptr<const Node> findMinRec(std::shared_ptr<const Node> root, 
+                                       int d, 
+                                       unsigned depth)
+{
+    if (!root) {
+        return nullptr;
+    }
+
+    int cd = depth % k;
+    if (cd == d) {
+        if (!root->left) {
+            return root;
+        }
+        return findMinRec(root->left, d, depth + 1);
+    }
+    return minNode(root,
+                   findMinRec(root->left, d, depth + 1),
+                   findMinRec(root->right, d, depth + 1), d);
+}
+
+inline std::shared_ptr<const Node> findMin(std::shared_ptr<const Node> root, int d)
+{
+    // Pass current level or depth as 0
+    return findMinRec(root, d, 0);
+}
+
+inline bool arePointsSame(const double point1[], const double point2[])
+{
+    for (int i = 0; i < k; ++i)
+        if (point1[i] != point2[i])
+            return false;
+
+    return true;
+}
+
+inline void copyPoint(double p1[],const double p2[])
+{
+   for (int i=0; i<k; i++)
+       p1[i] = p2[i];
+}
+
+inline std::shared_ptr<const Node> deleteNodeRec(std::shared_ptr<const Node> root,
+                                       const double point[],
+                                       unsigned depth)
+{
+    if (!root) {
+        return nullptr;
+    }
+
+    unsigned cd = depth % k;
+
+    if (arePointsSame(root->point, point)) {
+        // Leaf node
+        if (!root->left && !root->right) {
+            return nullptr;
+        }
+
+        // Node with children
+        if (root->right) {
+            auto minNode = findMin(root->right, cd);
+            double newPoint[k];
+            copyPoint(newPoint, minNode->point);
+            auto newRight = deleteNodeRec(root->right, minNode->point, depth + 1);
+            return std::make_shared<const Node>(newPoint, minNode->P, root->left, newRight);
+        } else { // only left child
+            auto minNode = findMin(root->left, cd);
+            double newPoint[k];
+            copyPoint(newPoint, minNode->point);
+            auto newRight = deleteNodeRec(root->left, minNode->point, depth + 1);
+            return std::make_shared<const Node>(newPoint, minNode->P, nullptr, newRight);
+        }
+    }
+
+    // Recurse left or right
+    if (point[cd] < root->point[cd]) {
+        auto newLeft = deleteNodeRec(root->left, point, depth + 1);
+        if (newLeft == root->left) {
+          return root; // no change
+        }   
+        return std::make_shared<const Node>(root->point, root->P, newLeft, root->right);
+    } else {
+        auto newRight = deleteNodeRec(root->right, point, depth + 1);
+        if (newRight == root->right) {
+            return root; // no change
+        }
+        return std::make_shared<const Node>(root->point, root->P, root->left, newRight);
+    }
+}
+
+inline std::shared_ptr<const Node> deleteNode(std::shared_ptr<const Node> root, double point[])
+{
+   // Pass depth as 0
+   return deleteNodeRec(root, point, 0);
+}
+
+inline void printKDTree(std::shared_ptr<const Node> root, int depth = 0)
+{
+    if (!root) return;
+
+    printKDTree(root->right, depth + 1);
+
+    std::cout << std::string(depth * 4, ' ');
+
+    std::cout << "(";
+    for (int i = 0; i < k; i++) {
+        std::cout << root->point[i];
+        if (i < k - 1) std::cout << ",";
+    }
+    std::cout << ")\n";
+
+    printKDTree(root->left, depth + 1);
+}
+
+inline double distanceSquared(const double a[], const double b[]) {
+    double dist = 0.0;
+    for (size_t i = 0; i < k; ++i) {
+        double diff = a[i] - b[i];
+        dist += diff * diff;
+    }
+    return dist;
+}
+
+inline void nearestNeighbor(
+    std::shared_ptr<const Node> root,
+    const double target[k],
+    int depth,
+    const Node*& best,
+    double& bestDist)
+{
+    if (!root) return;
+
+    double d = distanceSquared(root->point, target);
+    if (d < bestDist) {
+        bestDist = d;
+        best = root.get();
+    }
+
+    int cd = depth % k;
+    bool goLeft = target[cd] < root->point[cd];
+
+    nearestNeighbor(goLeft ? root->left : root->right, target, depth + 1, best, bestDist);
+
+    double diff = static_cast<double>(target[cd] - root->point[cd]);
+    if (diff * diff < bestDist) {
+        nearestNeighbor(goLeft ? root->right : root->left, target, depth + 1, best, bestDist);
+    }
+}
+
+inline const Node* findNearest(std::shared_ptr<const Node> root, const double target[k]) {
+    const Node* best = nullptr;
+    double bestDist = std::numeric_limits<double>::infinity();
+    nearestNeighbor(root, target, 0, best, bestDist);
+    return best;
+}
+
+inline void collectKDTreeLandmarks(std::shared_ptr<const Node> root, std::vector<Vector2d>& landmarks) {
+    if (!root) return;
+    collectKDTreeLandmarks(root->left, landmarks);
+    landmarks.emplace_back(Vector2d(root->point[0], root->point[1]));
+    collectKDTreeLandmarks(root->right, landmarks);
+}
+
+inline void findNodesWithinThreshold(
+    std::shared_ptr<const Node> root,
+    const double target[k],
+    double threshold,
+    std::vector<Vector2d>& results,
+    double target_theta = 0.0, // orientation in radians
+    double angle_swath = M_PI, // swath in radians (default 180 deg)
+    int depth = 0)
+{
+    if (!root) return;
+
+    double dist = std::sqrt(distanceSquared(root->point, target));
+    if (dist <= threshold) {
+        // Angle filtering
+        double dx = root->point[0] - target[0];
+        double dy = root->point[1] - target[1];
+        double bearing = std::atan2(dy, dx); // global bearing to point
+        double rel_angle = bearing - target_theta;
+        // Normalize to [-pi, pi]
+        while (rel_angle > M_PI) rel_angle -= 2 * M_PI;
+        while (rel_angle < -M_PI) rel_angle += 2 * M_PI;
+        if (std::abs(rel_angle) <= angle_swath / 2.0) {
+            results.emplace_back(Vector2d(root->point[0], root->point[1]));
+        }
+    }
+
+    int cd = depth % k;
+    double diff = target[cd] - root->point[cd];
+
+    // Search left subtree if it could contain points within threshold
+    if (diff <= 0 || std::abs(diff) < threshold) {
+        findNodesWithinThreshold(root->left, target, threshold, results, target_theta, angle_swath, depth + 1);
+    }
+    // Search right subtree if it could contain points within threshold
+    if (diff >= 0 || std::abs(diff) < threshold) {
+        findNodesWithinThreshold(root->right, target, threshold, results, target_theta, angle_swath, depth + 1);
+    }
+}
+
+// int main()
+// {
+//     double points[][k] = {{30, 40}, {5, 25}, {70, 70},
+//                         {10, 12}, {50, 30}, {35, 45}};
+//     std::shared_ptr<const Node> root = nullptr;
+
+//     int n = sizeof(points)/sizeof(points[0]);
+
+//     for (int i=0; i<n; i++)
+//         root = insert(root, points[i]);
+
+//     // Delete (30, 40);
+//     std::shared_ptr<const Node> root2 = deleteNode(root, points[0]);
+
+//     printKDTree(root);
+//     std::cout << "\n\n\n" << std::endl;
+//     const int target[2] = {5, 25};
+//     const int targetNew[2] = {9, 11};
+//     printKDTree(root2);
+//     std::cout << "\n\n\n" << std::endl;
+
+//     std::cout << findNearest(root, target)->point[0] << std::endl;
+
+//     return 0;
+// }
