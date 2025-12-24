@@ -12,7 +12,7 @@
 
 class Voxelization {
     public:
-        Voxelization(const double voxelSize = 0.25);
+        Voxelization(const double voxelSize = 0.05);
         ~Voxelization();
         pcl::PointCloud<pcl::PointXYZ>::Ptr voxelizeCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloudIn);
     private:
