@@ -1,14 +1,14 @@
 particle_filter:
   ros__parameters:
-    num_particles: 50
+    num_particles: 15
     new_particle_increase: 1
     max_range: 6.0 # meters
-    max_angle: 180.0 # degrees
-    new_particle_threshold: 0.8
-    neff_threshold: 0.5
+    max_angle: 250.0 # degrees
+    new_particle_threshold: 0.01
+    neff_threshold: 0.3
     measurement_noise_range: 0.05 # meters
     measurement_noise_bearing: 0.01 # rad/s
     linear_velocity_alpha_1: 0.2
     linear_velocity_alpha_2: 0.05
-    angular_velocity_alpha_2: 0.2
-    angular_velocity_alpha_1: 0.05
+    angular_velocity_alpha_2: 0.05
+    angular_velocity_alpha_1: 0.2

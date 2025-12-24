@@ -30,7 +30,7 @@ class EKFMiddleware : public rclcpp::Node {
           message.pose.pose.orientation.y = 0.0;
           message.pose.pose.orientation.z = sin(yaw * 0.5);
           message.pose.pose.orientation.w = cos(yaw * 0.5);
-          message.header.frame_id = "base_link";
+          message.header.frame_id = "map";
           publisher_->publish(message);
           RCLCPP_INFO(this->get_logger(), "X: %f, Y: %f, yaw: %f", state->x[0], state->x[1], yaw * 180.0 / M_PI);
         }

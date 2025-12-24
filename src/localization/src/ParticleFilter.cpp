@@ -176,7 +176,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
             sin(particle.x[2] + z_t[1]),  z_t[0] * cos(particle.x[2] + z_t[1]);
         MatrixXd sigma_j_t = H_j * Q_t * H_j.transpose();
         particle.addLandmark(Landmark(mu_j_t, sigma_j_t));
-        particle.seenLandmarks.push_back(mu_j_t);
+        particle.seenLandmarksThisCycle.push_back(mu_j_t);
     }
     else 
     {
@@ -189,7 +189,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
         MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * H) * oldLandmark.P;
         Landmark newLandmark(mu_j_t, sigma_j_t);
         particle.updateLandmark(oldLandmark, newLandmark);
-        particle.seenLandmarks.push_back(mu_j_t);
+        particle.seenLandmarksThisCycle.push_back(mu_j_t);
     }
 
 }
@@ -245,11 +245,11 @@ void ParticleFilter::particlePurgeLandmarks()
     std::for_each(std::execution::par, particles.begin(), particles.end(),
         [&](Particle& particle) {
             std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(maxRange, maxAngle);
-            std::vector<Vector2d>& seenLandmarks = particle.seenLandmarks;
+            std::vector<Vector2d>& seenLandmarksThisCycle = particle.seenLandmarksThisCycle;
             std::vector<Vector2d> inRangeButNotSeen;
             for (const auto& lm : landmarksInRange) {
                 bool seen = false;
-                for (const auto& seenLm : seenLandmarks) {
+                for (const auto& seenLm : seenLandmarksThisCycle) {
                     if ((lm - seenLm).norm() < 1e-6) { 
                         seen = true;
                         break;
@@ -261,9 +261,14 @@ void ParticleFilter::particlePurgeLandmarks()
             }
             for (auto& nS: inRangeButNotSeen) 
             {
-                particle.removeLandmark(nS);
+                if (particle.seenLandmarkCounts[nS(0)*nS(1)] <= 0) {
+                    particle.removeLandmark(nS);
+                }
+                else {
+                    particle.seenLandmarkCounts[nS(0)*nS(1)] -= 1;
+                }
             }
-            particle.seenLandmarks.clear();
+            particle.seenLandmarksThisCycle.clear();
         });
 }
 

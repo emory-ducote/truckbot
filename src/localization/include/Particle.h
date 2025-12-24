@@ -1,6 +1,7 @@
 #pragma once
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include <unordered_map>
 #include "Landmark.h"
 #include "PersistentKDTree.h"
 
@@ -23,6 +24,7 @@ struct Particle {
         {
             double points[2] = {point(0), point(1)};
             tree = deleteNode(tree, points);
+            seenLandmarkCounts.erase(point(0)*point(1));
         }
 
         void addLandmark(const Landmark& landmark) { 
@@ -30,12 +32,15 @@ struct Particle {
             Matrix2d cov = landmark.P;
             double points[2] = {point(0), point(1)};
             tree = insert(tree, points, cov); 
+            seenLandmarkCounts[point(0)*point(1)] = 1;
         }
 
         void updateLandmark(Landmark& oldLandmark, Landmark& newLandmark) 
         {
             removeLandmark(oldLandmark.x);
             addLandmark(newLandmark);
+            seenLandmarkCounts[newLandmark.x(0)*newLandmark.x(1)] = seenLandmarkCounts[oldLandmark.x(0)*oldLandmark.x(1)] + 1;
+            seenLandmarkCounts.erase(oldLandmark.x(0)*oldLandmark.x(1));
         }
 
         const Node * searchLandmark(double points[2])
@@ -59,7 +64,8 @@ struct Particle {
         }
 
         std::shared_ptr<const Node> tree = nullptr;
-        std::vector<Vector2d> seenLandmarks;
+        std::vector<Vector2d> seenLandmarksThisCycle;
+        std::unordered_map<double, int> seenLandmarkCounts; 
         Vector3d x;
         Matrix3d P;
         double weight = 1.0;
