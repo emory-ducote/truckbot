@@ -39,7 +39,7 @@ struct Particle {
         {
             removeLandmark(oldLandmark.x);
             addLandmark(newLandmark);
-            seenLandmarkCounts[newLandmark.x(0)*newLandmark.x(1)] = seenLandmarkCounts[oldLandmark.x(0)*oldLandmark.x(1)] + 1;
+            seenLandmarkCounts[newLandmark.x(0)*newLandmark.x(1)] = std::max(seenLandmarkCounts[oldLandmark.x(0)*oldLandmark.x(1)] + 1, 20);
             seenLandmarkCounts.erase(oldLandmark.x(0)*oldLandmark.x(1));
         }
 

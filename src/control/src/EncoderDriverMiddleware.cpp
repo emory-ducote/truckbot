@@ -50,18 +50,24 @@ class EncoderDriverMiddleware : public rclcpp::Node {
           auto leftFrontWheelSpeed = leftFront->getWheelSpeeds(0.10);
           auto leftRearWheelSpeed = leftRear->getWheelSpeeds(0.10);
 
-          auto rightWheelSpeed = (rightFrontWheelSpeed + rightRearWheelSpeed) / 2;
-          auto leftWheelSpeed = (leftFrontWheelSpeed + leftRearWheelSpeed) / 2;
+          RCLCPP_INFO(this->get_logger(), "LEFT FRONT: %f, LEFT REAR  %f", leftFrontWheelSpeed, leftRearWheelSpeed);
+          RCLCPP_INFO(this->get_logger(), "RIGHT FRONT: %f, RIGHT REAR %f", rightFrontWheelSpeed, rightRearWheelSpeed);
 
-          RCLCPP_INFO(this->get_logger(), "LEFT WHEEL: %f, RIGHT WHEEL %f", leftWheelSpeed, rightWheelSpeed);
+
+          // auto rightWheelSpeed = (rightFrontWheelSpeed + rightRearWheelSpeed) / 2;
+          // auto leftWheelSpeed = (leftFrontWheelSpeed + leftRearWheelSpeed) / 2;
+          auto rightWheelSpeed = rightFrontWheelSpeed;
+          auto leftWheelSpeed = -rightRearWheelSpeed;
+
+          // RCLCPP_INFO(this->get_logger(), "LEFT WHEEL: %f, RIGHT WHEEL %f", leftWheelSpeed, rightWheelSpeed);
           
           auto message = geometry_msgs::msg::Twist();
 
           //TODO:  this is wrong but seems to makes things work  
-          message.linear.x = (rightWheelSpeed + leftWheelSpeed); // should be / 2 - hm
+          message.linear.x = (rightWheelSpeed + leftWheelSpeed) / 2; // should be / 2 - hm
           
           message.angular.z = (rightWheelSpeed - leftWheelSpeed) / 0.2;
-          odom_publisher_->publish(message);
+	  odom_publisher_->publish(message);
         }
 
         std::shared_ptr<EncoderDriver> rightFront;

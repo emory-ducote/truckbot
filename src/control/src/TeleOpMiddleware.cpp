@@ -21,7 +21,7 @@ class JoyListener : public rclcpp::Node {
         double right_stick_x = msg->axes[4];  
         auto twist_message = geometry_msgs::msg::Twist();
         twist_message.linear.x = left_stick_x * 0.75;
-        twist_message.angular.z = right_stick_x;
+        twist_message.angular.z = right_stick_x * 5.0;
         cmd_vel_publisher_->publish(twist_message);
         int y_button = msg->buttons[0];
         int a_button = msg->buttons[1];

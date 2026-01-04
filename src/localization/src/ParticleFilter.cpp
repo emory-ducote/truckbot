@@ -34,7 +34,7 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                linearVelocityAlpha2(linearVelocityAlpha2),
                                angularVelocityAlpha1(angularVelocityAlpha1),
                                angularVelocityAlpha2(angularVelocityAlpha2) {
-    spdlog::set_level(spdlog::level::debug);
+    spdlog::set_level(spdlog::level::info);
     initialSigmas << 0.0, 0.0, 0.0;
 
     Q_t << measurementNoiseRange, 0, 

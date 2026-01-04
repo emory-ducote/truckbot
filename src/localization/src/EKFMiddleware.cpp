@@ -23,6 +23,7 @@ class EKFMiddleware : public rclcpp::Node {
           double w_t = msg->angular.z;
           state->ekf_loop(state->x, v_t, w_t);
           auto message = nav_msgs::msg::Odometry();
+	  message.header.frame_id = "map";
           message.pose.pose.position.x = state->x[0];
           message.pose.pose.position.y = state->x[1];
           double yaw = state->x[2];
