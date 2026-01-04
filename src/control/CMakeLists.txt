@@ -20,14 +20,6 @@ INCLUDE_DIRECTORIES(
   include
 )
   
-add_executable(motor_controller 
-  src/MotorControllerMiddleware.cpp
-  src/MotorController.cpp
-)
-
-target_link_libraries(motor_controller lgpio)
-ament_target_dependencies(motor_controller rclcpp std_msgs sensor_msgs)
-
 add_executable(teleop
   src/TeleOpMiddleware.cpp
 )
@@ -38,22 +30,35 @@ ament_target_dependencies(teleop
   sensor_msgs
 )
 
-add_executable(encoder_driver
-  src/EncoderDriverMiddleware.cpp
-  src/EncoderDriver.cpp
-)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  add_executable(motor_controller 
+    src/MotorControllerMiddleware.cpp
+    src/MotorController.cpp
+  )
 
-target_link_libraries(encoder_driver lgpio)
-ament_target_dependencies(encoder_driver
-  rclcpp
-  std_msgs
-  geometry_msgs
-)
+  target_link_libraries(motor_controller lgpio)
+  ament_target_dependencies(motor_controller rclcpp std_msgs sensor_msgs)
+
+  add_executable(encoder_driver
+    src/EncoderDriverMiddleware.cpp
+    src/EncoderDriver.cpp
+  )
+
+  target_link_libraries(encoder_driver lgpio)
+  ament_target_dependencies(encoder_driver
+    rclcpp
+    std_msgs
+    geometry_msgs
+  )
+
+  install(TARGETS
+    motor_controller
+    encoder_driver
+    DESTINATION lib/${PROJECT_NAME})
+endif()
 
 install(TARGETS
-  motor_controller
   teleop
-  encoder_driver
   DESTINATION lib/${PROJECT_NAME})
 
 
