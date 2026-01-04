@@ -12,16 +12,21 @@
 class VoxelizationMiddleware : public rclcpp::Node
 {
 public:
-  VoxelizationMiddleware(std::shared_ptr<Voxelization> voxelization)
-  : Node("voxelization_middleware"), voxelization(voxelization)
+  VoxelizationMiddleware() : Node("voxelization_middleware")
   {
+    double voxelSize = this->declare_parameter<double>("voxel_size", 0.05);
     // Create a subscription to /scan topic
     scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 
                                                                            10,                           
                                                                           std::bind(&VoxelizationMiddleware::scanCallback, this, std::placeholders::_1));
     cluster_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/cluster_markers", 10);
+
+    RCLCPP_INFO(this->get_logger(), "Using voxel size of %f meters", voxelSize);
+  
+    voxelization = std::make_shared<Voxelization>(voxelSize);
   }
 
+  
 void publishClusters(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
 {
   visualization_msgs::msg::MarkerArray marker_array;
@@ -88,8 +93,7 @@ private:
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto voxelization = std::make_shared<Voxelization>();
-  rclcpp::spin(std::make_shared<VoxelizationMiddleware>(voxelization));
+  rclcpp::spin(std::make_shared<VoxelizationMiddleware>());
   rclcpp::shutdown();
   return 0;
 }
