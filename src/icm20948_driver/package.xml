@@ -9,6 +9,8 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>Eigen3</depend>
+  <depend>lgpio></depend>
+  <depend>fmt</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

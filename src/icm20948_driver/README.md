@@ -15,6 +15,7 @@ This package provides a ROS2 driver node for the ICM-20948 IMU sensor. It publis
 - sensor_msgs
 - Eigen3
 - lgpio
+- fmt
 
 ## Building
 Clone this package into your ROS2 workspace `src` directory and build with colcon:

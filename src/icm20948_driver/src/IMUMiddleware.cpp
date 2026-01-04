@@ -16,9 +16,10 @@ class IMUPublisher : public rclcpp::Node {
             publisher_ = this->create_publisher<sensor_msgs::msg::Imu>("imu", 10);
             timer_ = this->create_wall_timer(
                 10ms, std::bind(&IMUPublisher::timer_callback, this));
-            }
+	    imu = std::make_shared<rpi5ICM20948>(deviceId);
+        }
 
-            imu = std::make_shared<rpit5ICM20948>(deviceId);
+            std::shared_ptr<rpi5ICM20948> imu; 
     private:
         void timer_callback()
         {
@@ -37,7 +38,6 @@ class IMUPublisher : public rclcpp::Node {
             message.orientation.z = uz;
             publisher_->publish(message);
         }
-        std::shared_ptr<rpi5ICM20948> imu;
         rclcpp::TimerBase::SharedPtr timer_;
         rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher_;
         
