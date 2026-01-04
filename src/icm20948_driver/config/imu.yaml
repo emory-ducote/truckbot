@@ -1,0 +1,3 @@
+icm20948_driver:
+  ros__parameters:
+    i2c_device: 0x68

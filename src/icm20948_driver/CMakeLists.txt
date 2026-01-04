@@ -14,6 +14,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
+find_package(fmt REQUIRED)
+
 
 
 INCLUDE_DIRECTORIES(
@@ -27,12 +29,21 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
     src/rpi5ICM20948.cpp
   )
 
-  target_link_libraries(imu lgpio Eigen3::Eigen)
+  target_link_libraries(imu lgpio Eigen3::Eigen fmt::fmt)
   ament_target_dependencies(imu rclcpp sensor_msgs)
 
   install(TARGETS
     imu
     DESTINATION lib/${PROJECT_NAME})
+
+  install(DIRECTORY launch/
+    DESTINATION share/${PROJECT_NAME}/launch
+  )
+
+  install(DIRECTORY config/
+    DESTINATION share/${PROJECT_NAME}/config
+  )
+
 else()
   message(STATUS "Skipping imu target: not on ARM architecture (detected: ${CMAKE_SYSTEM_PROCESSOR})")
 endif()
