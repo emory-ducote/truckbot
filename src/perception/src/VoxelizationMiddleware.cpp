@@ -59,7 +59,7 @@ void publishClusters(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
 
     marker_array.markers.push_back(marker);
   }
-  RCLCPP_INFO(this->get_logger(), "Sending %d points", marker_array.markers.size());
+  RCLCPP_INFO(this->get_logger(), "Sending %ld points", marker_array.markers.size());
 
   cluster_pub_->publish(marker_array);
 }

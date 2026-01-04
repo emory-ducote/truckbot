@@ -25,7 +25,8 @@ class JoyListener : public rclcpp::Node {
         cmd_vel_publisher_->publish(twist_message);
         int y_button = msg->buttons[0];
         int a_button = msg->buttons[1];
-        bool up = (y_button > 0) ? true : (a_button > 0) ? false : up;
+        bool up = false;
+        up = (y_button > 0) ? true : (a_button > 0) ? false : up;
         auto bool_message = std_msgs::msg::Bool();
         bool_message.data = up;
         cmd_actuator_publisher_->publish(bool_message);
