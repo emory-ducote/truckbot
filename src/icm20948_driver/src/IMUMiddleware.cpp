@@ -9,13 +9,16 @@ using namespace std::chrono_literals;
 
 class IMUPublisher : public rclcpp::Node {
     public:
-    IMUPublisher(std::shared_ptr<rpi5ICM20948> imu) : Node("joy_listener"), imu(imu)
+    IMUPublisher() : Node("imu_middleware")
         {
+            int deviceId = this->declare_parameter<int>("i2c_device", 0x68);
+
             publisher_ = this->create_publisher<sensor_msgs::msg::Imu>("imu", 10);
             timer_ = this->create_wall_timer(
                 10ms, std::bind(&IMUPublisher::timer_callback, this));
-        }
-        std::shared_ptr<rpi5ICM20948> imu;
+            }
+
+            imu = std::make_shared<rpit5ICM20948>(deviceId);
     private:
         void timer_callback()
         {
@@ -34,6 +37,7 @@ class IMUPublisher : public rclcpp::Node {
             message.orientation.z = uz;
             publisher_->publish(message);
         }
+        std::shared_ptr<rpi5ICM20948> imu;
         rclcpp::TimerBase::SharedPtr timer_;
         rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher_;
         
@@ -41,9 +45,7 @@ class IMUPublisher : public rclcpp::Node {
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
-    const uint8_t i2cDevice = 0x68;
-    auto imu = std::make_shared<rpi5ICM20948>(i2cDevice);
-    auto node = std::make_shared<IMUPublisher>(imu);
+    auto node = std::make_shared<IMUPublisher>();
     rclcpp::on_shutdown([node]() {
         RCLCPP_INFO(node->get_logger(), "Shutdown callback triggered.");
         node->imu->resetMaster();

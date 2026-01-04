@@ -10,12 +10,16 @@
 #include <algorithm>
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
+#include <spdlog/spdlog.h>
+
  
 rpi5ICM20948::rpi5ICM20948(const uint8_t device) {
+    spdlog::set_level(spdlog::level::info);
+
     uint8_t reg;
     handle = lgI2cOpen(1, device, 0);
     if (handle < 0) {
-        fprintf(stderr, "Error opening IMU\n");
+        spdlog::error("Error opening IMU");
     }     
 
     resetMaster();
@@ -62,7 +66,7 @@ rpi5ICM20948::rpi5ICM20948(const uint8_t device) {
     uint8_t whoAmI = lgI2cReadByteData(handle, WHO_AM_I);
     if (whoAmI != DEVICE_ID)
     {
-        fprintf(stderr, "Device ID wrong for icm20948\n");
+        spdlog::error("Device ID wrong for icm20948\n");
     }
 
     // set mag to poweroff, sleep, then set to continuious mode 1
@@ -75,7 +79,7 @@ rpi5ICM20948::rpi5ICM20948(const uint8_t device) {
     whoAmI = readMagReg(MAG_WHO_AM_I);
     if (whoAmI != MAG_DEVICE_ID)
     {
-        fprintf(stderr, "Device ID wrong for mag");
+        spdlog::error("Device ID wrong for mag");
     }
     
     // set up slave 0 to read into slave 0 data registers
@@ -196,7 +200,7 @@ void rpi5ICM20948::calibrateSensor() {
     Eigen::Vector3f magMax = Eigen::Vector3f::Constant(-1e9);
 
     float ax, ay, az, gx, gy, gz, ux, uy, uz;
-    std::cout << "Starting calibration..." << std::endl;
+    spdlog::info("Starting calibration...");
     for (int i = 0; i < calibrateSamples; ++i) {
         getAccelerometerAndGyroscopeData(ax, ay, az, gx, gy, gz);
         getMagnetometerData(ux, uy, uz);
@@ -212,11 +216,15 @@ void rpi5ICM20948::calibrateSensor() {
 
         usleep(125000); // Sleep for 125ms
     }
-    std::cout << "Finished calibration" << std::endl;
-
+    spdlog::info("Finished calibration");
+    
+    
     accelOffset = accelSum / calibrateSamples;
     gyroOffset = gyroSum / calibrateSamples;
     magOffset = (magMax + magMin) * 0.5f;
     
+    spdlog::info("Accel offsets: {}, {}, {}", accelOffset.x(), accelOffset.y(), accelOffset.z());
+    spdlog::info("Gyro offsets: {}, {}, {}", gyroOffset.x(), gyroOffset.y(), gyroOffset.z()); 
+    spdlog::info("Mag offsets: {}, {}, {}", magOffset.x(), magOffset.y(), magOffset.z()); 
 }
 
