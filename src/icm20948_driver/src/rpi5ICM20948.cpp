@@ -147,7 +147,7 @@ void rpi5ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
 }
 
 int rpi5ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
-    static uint8_t data[8];
+    static char data[8];
     int16_t uiUx, uiUy, uiUz;
 
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
@@ -165,14 +165,13 @@ int rpi5ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
 }
  
 int rpi5ICM20948::getAccelerometerAndGyroscopeData(float &ax, float &ay, float &az, float &gx, float &gy, float &gz) {
-    static uint8_t data[12];
+    static char data[12];
     int16_t uiAx, uiAy, uiAz, uiGx, uiGy, uiGz;
     
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
     
     // Read accel and gyroscope raw data in
     int success = lgI2cReadI2CBlockData(handle, ACCEL_XOUT_H, data, 12);
-    std::cout << "ACCEL READ: " << success << std::endl;
      
     uiAx = (int16_t) (data[0] << 8) | data[1];
     uiAy = (int16_t) (data[2] << 8) | data[3];

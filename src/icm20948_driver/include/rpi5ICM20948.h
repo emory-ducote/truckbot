@@ -142,9 +142,9 @@ class rpi5ICM20948 {
         const float DEG2RAD = M_PI / 180.0f;
         const float G2MPSS = 9.80665f;
         const int duration = 100;
-        Eigen::Vector3f accelOffset;
-        Eigen::Vector3f gyroOffset;
-        Eigen::Vector3f magOffset;
+        Eigen::Vector3f accelOffset = Eigen::Vector3f::Zero();
+        Eigen::Vector3f gyroOffset = Eigen::Vector3f::Zero();
+        Eigen::Vector3f magOffset = Eigen::Vector3f::Zero();
         uint8_t readMagReg(uint8_t reg);
         void writeMagReg(uint8_t reg, uint8_t data);
         void calibrateSensor();
