@@ -20,16 +20,16 @@ class MotorControllerMiddleware : public rclcpp::Node {
           double wheelRadius = this->declare_parameter<double>("wheel_radius", 0.03);
           int maxWheelMotorRpm = this->declare_parameter<int>("max_wheel_motor_rpm", 251);
           int chip = this->declare_parameter<int>("chip", 4);
-          int rightFrontOne = this->declare_parameter<int>("rightFrontOne", 13);
-          int rightFrontTwo = this->declare_parameter<int>("rightFrontTwo", 6);
-          int rightRearOne = this->declare_parameter<int>("rightRearOne", 22);
-          int rightRearTwo = this->declare_parameter<int>("rightRearTwo", 10);
-          int leftFrontOne = this->declare_parameter<int>("leftFrontOne", 26);
-          int leftFrontTwo = this->declare_parameter<int>("leftFrontTwo", 19);
-          int leftRearOne = this->declare_parameter<int>("leftRearOne", 17);
-          int leftRearTwo = this->declare_parameter<int>("leftRearTwo", 27);
-          int liftOne = this->declare_parameter<int>("liftOne", 9);
-          int liftTwo = this->declare_parameter<int>("liftTwo", 11);
+          int rightFrontOne = this->declare_parameter<int>("right_front_one", 22);
+          int rightFrontTwo = this->declare_parameter<int>("right_front_two", 0);
+          int rightRearOne = this->declare_parameter<int>("right_rear_one", 5);
+          int rightRearTwo = this->declare_parameter<int>("right_rear_two", 6);
+          int leftFrontOne = this->declare_parameter<int>("left_front_one", 26);
+          int leftFrontTwo = this->declare_parameter<int>("left_front_two", 19);
+          int leftRearOne = this->declare_parameter<int>("left_rear_one", 23);
+          int leftRearTwo = this->declare_parameter<int>("left_rear_two", 18);
+          int liftOne = this->declare_parameter<int>("lift_one", 17);
+          int liftTwo = this->declare_parameter<int>("lift_two", 27);
           std::string wheel_control_topic = this->declare_parameter<std::string>("wheel_control_topic", "/cmd_vel");
           std::string actuator_control_topic = this->declare_parameter<std::string>("actuator_control_topic", "/cmd_actuator");
 

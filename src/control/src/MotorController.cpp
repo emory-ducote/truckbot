@@ -39,16 +39,16 @@ MotorController::MotorController(const uint8_t& chip,
         fprintf(stderr, "Error opening GPIO chip %d\n", chip);
     }
 
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftFrontOne, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftFrontTwo, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftRearOne, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftRearTwo, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightFrontOne, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightFrontTwo, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightRearOne, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightRearTwo, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_DOWN, liftOne, 1);
-    lgGpioClaimOutput(handle, LG_SET_PULL_DOWN, liftTwo, 1);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftFrontOne, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftFrontTwo, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftRearOne, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, leftRearTwo, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightFrontOne, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightFrontTwo, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightRearOne, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, rightRearTwo, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftOne, 0);
+    lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftTwo, 0);
 
 }
 

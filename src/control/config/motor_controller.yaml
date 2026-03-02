@@ -8,13 +8,13 @@ motor_controller:
 
     # wheel pins
     chip: 4
-    right_front_one: 13
-    right_front_two: 6
-    right_rear_one: 22
-    right_rear_two: 10
+    right_front_one: 22
+    right_front_two: 0
+    right_rear_one: 5
+    right_rear_two: 6
     left_front_one: 26
     left_front_two: 19
-    left_rear_one: 17
-    left_rear_two: 27
-    lift_one: 9
-    lift_two: 11
+    left_rear_one: 23
+    left_rear_two: 18
+    lift_one: 17
+    lift_two: 27

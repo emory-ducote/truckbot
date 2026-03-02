@@ -7,11 +7,11 @@ encoder_driver:
 
     # pin assignments
     chip: 4
-    right_front_a: 15
-    right_front_b: 14
-    right_rear_a: 1
+    right_front_a: 24
+    right_front_b: 25
+    right_rear_a: 8
     right_rear_b: 7
-    left_front_a: 23
-    left_front_b: 24
-    left_rear_a: 25
-    left_rear_b: 8
+    left_front_a: 1
+    left_front_b: 16
+    left_rear_a: 20
+    left_rear_b: 21
