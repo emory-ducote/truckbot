@@ -16,14 +16,14 @@ class EncoderDriverMiddleware : public rclcpp::Node {
         int encoderCPR = this->declare_parameter<int>("encoder_cpr", 700);
         int encoderMultiplier = this->declare_parameter<int>("encoder_multiplier", 4);
         int chip = this->declare_parameter<int>("chip", 4);
-        int rightFrontA = this->declare_parameter<int>("rightFrontA", 15);
-        int rightFrontB = this->declare_parameter<int>("rightFrontB", 14);
-        int rightRearA = this->declare_parameter<int>("rightRearA", 1);
-        int rightRearB = this->declare_parameter<int>("rightRearB", 7);
-        int leftFrontA = this->declare_parameter<int>("leftFrontA", 23);
-        int leftFrontB = this->declare_parameter<int>("leftFrontB", 24);
-        int leftRearA = this->declare_parameter<int>("leftRearA", 25);
-        int leftRearB = this->declare_parameter<int>("leftRearB", 8);
+        int rightFrontA = this->declare_parameter<int>("right_front_a", 24);
+        int rightFrontB = this->declare_parameter<int>("right_front_b", 25);
+        int rightRearA = this->declare_parameter<int>("right_rear_a", 8);
+        int rightRearB = this->declare_parameter<int>("right_rear_b", 7);
+        int leftFrontA = this->declare_parameter<int>("left_front_a", 1);
+        int leftFrontB = this->declare_parameter<int>("left_front_b", 16);
+        int leftRearA = this->declare_parameter<int>("left_rear_a", 20);
+        int leftRearB = this->declare_parameter<int>("left_rear_b", 21);
 
         std::string encoder_topic = this->declare_parameter<std::string>("encoder_odometry_topic", "/odom");
         int update_rate = this->declare_parameter<int>("update_rate", 10);
