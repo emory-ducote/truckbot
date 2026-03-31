@@ -166,7 +166,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
 
     if (newFeature) 
     {
-        particle.weight = newParticleThreshold*particle.weight;
+        particle.weight = particle.weight;
         double global_angle = wrapAngle(particle.x[2] + z_t[1]);
         double mapX = particle.x[0] + z_t[0] * cos(global_angle);
         double mapY = particle.x[1] + z_t[0] * sin(global_angle);
@@ -276,7 +276,7 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
 {
     spdlog::debug("Started Resampling");
 
-    double weightSum;
+    double weightSum = 0.0;
     for (int p = 0; p < numParticles; p++) {
         weightSum += particles[p].weight;
     }
