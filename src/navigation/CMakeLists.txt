@@ -30,11 +30,16 @@ target_link_libraries(path_tracker)
 ament_target_dependencies(path_tracker rclcpp nav_msgs std_msgs)
 
 add_executable(spline_generator
+  src/SplineGeneratorMiddleware.cpp
   src/SplineGenerator.cpp
 )
 
+target_link_libraries(spline_generator)
+ament_target_dependencies(spline_generator rclcpp nav_msgs std_msgs)
+
 install(TARGETS
   path_tracker
+  spline_generator
   DESTINATION lib/${PROJECT_NAME})
 
 

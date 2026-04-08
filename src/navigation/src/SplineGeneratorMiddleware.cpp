@@ -1,35 +1,22 @@
 
 #include <chrono>
 #include "rclcpp/rclcpp.hpp"
-#include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "std_msgs/msg/int64.hpp"
-#include "PathTracker.h"
+#include "SplineGenerator.h"
 
 
-class PathTrackerMiddleware : public rclcpp::Node {
+class SplineGeneratorMiddleware : public rclcpp::Node {
   public:
-    PathTrackerMiddleware(std::shared_ptr<PathTracker> pathTracker) : Node("path_tracker_middleware"), pathTracker(pathTracker)
+    SplineGeneratorMiddleware(std::shared_ptr<SplineGenerator> splineGenerator) : Node("path_tracker_middleware"), splineGenerator(splineGenerator)
     {
-      odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-                "/local_odom", 10, std::bind(&PathTrackerMiddleware::odomCallback, this, std::placeholders::_1));
       path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
-                "/global_path", 10, std::bind(&PathTrackerMiddleware::pathCallback, this, std::placeholders::_1));
-      global_path_index_pub_ = this->create_publisher<std_msgs::msg::Int64>("/global_path_index", 10);
-      timer_ = this->create_wall_timer(
-              std::chrono::milliseconds(100),
-              std::bind(&PathTrackerMiddleware::timerCallback, this));
+                "/global_path", 10, std::bind(&SplineGeneratorMiddleware::pathCallback, this, std::placeholders::_1));
+      global_path_index_sub_ = this->create_subscription<std_msgs::msg::Int64>(
+                "/global_path_index", 10, std::bind(&SplineGeneratorMiddleware::pathIndexCallback, this, std::placeholders::_1));
     }
 
   private:
-    void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
-    {
-      navigation::VehiclePose newPose(msg->pose.pose.position.x,
-                                      msg->pose.pose.position.y,
-                                      msg->pose.pose.orientation.z);
-      pathTracker->setVehiclePose(newPose);
-      
-    }
     void pathCallback(const nav_msgs::msg::Path::SharedPtr msg)
     {
       std::vector<navigation::VehiclePose> newPath;
@@ -40,29 +27,24 @@ class PathTrackerMiddleware : public rclcpp::Node {
                                         pose.pose.orientation.z);
         newPath.push_back(newPose);
       }
-      pathTracker->setGlobalPath(newPath);
+      splineGenerator->setGlobalPath(newPath);
     }
-    void timerCallback()
+    void pathIndexCallback(const std_msgs::msg::Int64::SharedPtr msg)
     {
-      int closestIndex = pathTracker->findNearestPose();
-      RCLCPP_INFO(this->get_logger(), "Nearest Path Index: %d", closestIndex);
-      auto closestIndexMessage = std_msgs::msg::Int64();
-      closestIndexMessage.data = closestIndex;  
-      global_path_index_pub_->publish(closestIndexMessage);
+      splineGenerator->setNearestPoseIndex(msg->data);
+      splineGenerator->generateSpline();
     }
 
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
-    rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr global_path_index_pub_;
-    rclcpp::TimerBase::SharedPtr timer_;
-    std::shared_ptr<PathTracker> pathTracker;
+    rclcpp::Subscription<std_msgs::msg::Int64>::SharedPtr global_path_index_sub_;
+    std::shared_ptr<SplineGenerator> splineGenerator;
 };
 
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto pathTracker = std::make_shared<PathTracker>();
-  rclcpp::spin(std::make_shared<PathTrackerMiddleware>(pathTracker));
+  auto splineGenerator = std::make_shared<SplineGenerator>();
+  rclcpp::spin(std::make_shared<SplineGeneratorMiddleware>(splineGenerator));
   rclcpp::shutdown();
   return 0;
 }

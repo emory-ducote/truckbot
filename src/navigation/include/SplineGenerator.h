@@ -8,9 +8,13 @@ class SplineGenerator {
     public:
         SplineGenerator();
         ~SplineGenerator();
+        void setGlobalPath(const std::vector<navigation::VehiclePose>& path);
+        const std::vector<navigation::VehiclePose>& getGlobalPath() const;
+        void setNearestPoseIndex(const int poseIndex);
+        int getNearestPoseIndex() const;
         std::vector<navigation::VehiclePose> generateSpline();
     private:
-        int nearestPose;
+        int nearestPoseIndex;
         std::vector<navigation::VehiclePose> globalPath;
         double sampleScale = 2.0;
 };

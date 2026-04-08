@@ -5,6 +5,26 @@ SplineGenerator::SplineGenerator() {};
 
 SplineGenerator::~SplineGenerator() {};
 
+void SplineGenerator::setGlobalPath(const std::vector<navigation::VehiclePose>& path)
+{
+    this->globalPath = path;
+}
+
+const std::vector<navigation::VehiclePose>& SplineGenerator::getGlobalPath() const
+{
+    return this->globalPath;
+}
+
+void SplineGenerator::setNearestPoseIndex(const int poseIndex)
+{
+    this->nearestPoseIndex = poseIndex;
+}
+
+int SplineGenerator::getNearestPoseIndex() const
+{
+    return this->nearestPoseIndex;
+}
+
 navigation::VehiclePose getPoseClamped(const std::vector<navigation::VehiclePose>& points, int index)
 {
     if (index < 0)
@@ -27,22 +47,24 @@ double cubicHermite(double p0, double p1, double p2, double p3, double t)
 
 std::vector<navigation::VehiclePose> SplineGenerator::generateSpline()
 {
-    int sampleCount = int(this->globalPath[this->nearestPose].euclideanDistanceTo(globalPath[-1]) * sampleScale);
+    std::vector<navigation::VehiclePose> splinePoses;
+    int sampleCount = int(this->globalPath[this->nearestPoseIndex].euclideanDistanceTo(globalPath[-1]) * sampleScale);
 
-    std::vector<navigation::VehiclePose> relevantPoints(globalPath.begin() + this->nearestPose, globalPath.end());
+    std::vector<navigation::VehiclePose> relevantPoints(this->globalPath.begin() + this->nearestPoseIndex, globalPath.end());
     for (int i = 0; i < sampleCount; ++i)
-        {
-            double percent = ((double)i) / (double(sampleCount - 1));
-            double tx = (relevantPoints.size() -1) * percent;
-            int index = int(tx);
-            double t = tx - floor(tx);
- 
-            navigation::VehiclePose a = getPoseClamped(relevantPoints, index - 1);
-            navigation::VehiclePose b = getPoseClamped(relevantPoints, index + 0);
-            navigation::VehiclePose c = getPoseClamped(relevantPoints, index + 1);
-            navigation::VehiclePose d = getPoseClamped(relevantPoints, index + 2);
-            double x = cubicHermite(a.x, b.x, c.x, d.x, t);
-            double y = cubicHermite(a.y, b.y, c.y, d.y, t);
- 
+    {
+        double percent = ((double)i) / (double(sampleCount - 1));
+        double tx = (relevantPoints.size() -1) * percent;
+        int index = int(tx);
+        double t = tx - floor(tx);
+
+        navigation::VehiclePose a = getPoseClamped(relevantPoints, index - 1);
+        navigation::VehiclePose b = getPoseClamped(relevantPoints, index + 0);
+        navigation::VehiclePose c = getPoseClamped(relevantPoints, index + 1);
+        navigation::VehiclePose d = getPoseClamped(relevantPoints, index + 2);
+        double x = cubicHermite(a.x, b.x, c.x, d.x, t);
+        double y = cubicHermite(a.y, b.y, c.y, d.y, t);
+        splinePoses.push_back(navigation::VehiclePose(x, y, 0.0));
     }
+    return splinePoses;
 }
