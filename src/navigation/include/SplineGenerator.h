@@ -16,7 +16,7 @@ class SplineGenerator {
     private:
         int nearestPoseIndex;
         std::vector<navigation::VehiclePose> globalPath;
-        double sampleScale = 2.0;
+        double sampleScale = 4.0;
 };
 
 #endif

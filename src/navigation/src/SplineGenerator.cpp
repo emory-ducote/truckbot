@@ -1,4 +1,5 @@
 #include "SplineGenerator.h"
+#include <iostream>
 
 
 SplineGenerator::SplineGenerator() {};
@@ -48,9 +49,24 @@ double cubicHermite(double p0, double p1, double p2, double p3, double t)
 std::vector<navigation::VehiclePose> SplineGenerator::generateSpline()
 {
     std::vector<navigation::VehiclePose> splinePoses;
-    int sampleCount = int(this->globalPath[this->nearestPoseIndex].euclideanDistanceTo(globalPath[-1]) * sampleScale);
+    if (this->globalPath.empty()) {
+        return splinePoses;
+    }
 
-    std::vector<navigation::VehiclePose> relevantPoints(this->globalPath.begin() + this->nearestPoseIndex, globalPath.end());
+    int clampedIndex = this->nearestPoseIndex;
+    if (clampedIndex < 0) {
+        clampedIndex = 0;
+    }
+    if (clampedIndex >= int(this->globalPath.size())) {
+        clampedIndex = int(this->globalPath.size()) - 1;
+    }
+
+    int sampleCount = int(this->globalPath[clampedIndex].euclideanDistanceTo(globalPath.back()) * sampleScale);
+    if (sampleCount < 2) {
+        sampleCount = 2;
+    }
+
+    std::vector<navigation::VehiclePose> relevantPoints(this->globalPath.begin() + clampedIndex, globalPath.end());
     for (int i = 0; i < sampleCount; ++i)
     {
         double percent = ((double)i) / (double(sampleCount - 1));
