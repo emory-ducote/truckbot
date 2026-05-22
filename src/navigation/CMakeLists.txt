@@ -14,6 +14,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 
@@ -37,9 +38,17 @@ add_executable(spline_generator
 target_link_libraries(spline_generator)
 ament_target_dependencies(spline_generator rclcpp nav_msgs std_msgs)
 
+add_executable(simple_path_server
+  src/SimplePathServerMiddleware.cpp
+)
+
+target_link_libraries(simple_path_server)
+ament_target_dependencies(simple_path_server rclcpp nav_msgs geometry_msgs)
+
 install(TARGETS
   path_tracker
   spline_generator
+  simple_path_server
   DESTINATION lib/${PROJECT_NAME})
 
 
