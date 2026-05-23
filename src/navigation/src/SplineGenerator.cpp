@@ -2,7 +2,7 @@
 #include <iostream>
 
 
-SplineGenerator::SplineGenerator() {};
+SplineGenerator::SplineGenerator(double sampleScale) : sampleScale(sampleScale) {};
 
 SplineGenerator::~SplineGenerator() {};
 
@@ -24,6 +24,16 @@ void SplineGenerator::setNearestPoseIndex(const int poseIndex)
 int SplineGenerator::getNearestPoseIndex() const
 {
     return this->nearestPoseIndex;
+}
+
+void SplineGenerator::setSampleScale(double scale)
+{
+    this->sampleScale = scale;
+}
+
+double SplineGenerator::getSampleScale() const
+{
+    return this->sampleScale;
 }
 
 navigation::VehiclePose getPoseClamped(const std::vector<navigation::VehiclePose>& points, int index)

@@ -9,8 +9,11 @@
 
 class SplineGeneratorMiddleware : public rclcpp::Node {
   public:
-    SplineGeneratorMiddleware(std::shared_ptr<SplineGenerator> splineGenerator) : Node("spline_generator_middleware"), splineGenerator(splineGenerator)
+    SplineGeneratorMiddleware() : Node("spline_generator_middleware")
     {
+      double sample_scale = this->declare_parameter<double>("sample_scale", 4.0);
+      splineGenerator = std::make_shared<SplineGenerator>(sample_scale);
+      
       path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
                 "/global_path", 10, std::bind(&SplineGeneratorMiddleware::pathCallback, this, std::placeholders::_1));
       global_path_index_sub_ = this->create_subscription<std_msgs::msg::Int64>(
@@ -69,8 +72,7 @@ class SplineGeneratorMiddleware : public rclcpp::Node {
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  auto splineGenerator = std::make_shared<SplineGenerator>();
-  rclcpp::spin(std::make_shared<SplineGeneratorMiddleware>(splineGenerator));
+  rclcpp::spin(std::make_shared<SplineGeneratorMiddleware>());
   rclcpp::shutdown();
   return 0;
 }

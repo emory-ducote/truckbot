@@ -3,5 +3,5 @@ simple_path_server_middleware:
     path_frame: map
     path_topic: /global_path
     publish_rate: 5.0
-    path_x: [0.0, 1.0, 2.0, 2.0]
-    path_y: [0.0, 0.0, 0.0, 1.0]
+    path_x: [0.0, 1.0, 2.0, 2.0, 2.0, 2.0, 3.0]
+    path_y: [0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 4.0]

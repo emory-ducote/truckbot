@@ -39,7 +39,7 @@ private:
     local_path_msg_.header.frame_id = path_frame_;
     local_path_msg_.poses.clear();
 
-    if (path_x_.empty() || path_y_.empty() || path_theta_.empty()) {
+    if (path_x_.empty() || path_y_.empty()) {
       RCLCPP_WARN(this->get_logger(), "No path points configured. Publish loop will still run but no path will be published.");
       return;
     }

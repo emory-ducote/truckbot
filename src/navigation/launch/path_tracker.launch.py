@@ -5,16 +5,16 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    voxelization_config = os.path.join(
+    path_tracker_config = os.path.join(
         get_package_share_directory('navigation'),
         'config',
-        'voxelization.yaml'
+        'path_tracker.yaml'
     )
     return LaunchDescription([
         Node(
             package='navigation',
-            executable='voxelization',
-            name='voxelization',
-            parameters=[voxelization_config]
+            executable='path_tracker',
+            name='path_tracker_middleware',
+            parameters=[path_tracker_config]
         )
     ])
