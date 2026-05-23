@@ -8,7 +8,7 @@ def generate_launch_description():
     simple_path_config = os.path.join(
         get_package_share_directory('navigation'),
         'config',
-        'simple_path_server_params.yaml'
+        'simple_path_server.yaml'
     )
 
     return LaunchDescription([

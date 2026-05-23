@@ -4,6 +4,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "std_msgs/msg/int64.hpp"
+#include "geometry_msgs/msg/point_stamped.hpp"
 #include "PathTracker.h"
 
 
@@ -16,6 +17,7 @@ class PathTrackerMiddleware : public rclcpp::Node {
       path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
                 "/global_path", 10, std::bind(&PathTrackerMiddleware::pathCallback, this, std::placeholders::_1));
       global_path_index_pub_ = this->create_publisher<std_msgs::msg::Int64>("/global_path_index", 10);
+      nearest_path_point_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/nearest_path_point", 10);
       timer_ = this->create_wall_timer(
               std::chrono::milliseconds(100),
               std::bind(&PathTrackerMiddleware::timerCallback, this));
@@ -49,11 +51,24 @@ class PathTrackerMiddleware : public rclcpp::Node {
       auto closestIndexMessage = std_msgs::msg::Int64();
       closestIndexMessage.data = closestIndex;  
       global_path_index_pub_->publish(closestIndexMessage);
+
+      // Publish tracked coordinate
+      const auto& globalPath = pathTracker->getGlobalPath();
+      if (closestIndex >= 0 && closestIndex < static_cast<int>(globalPath.size())) {
+        geometry_msgs::msg::PointStamped trackedCoordinate;
+        trackedCoordinate.header.stamp = this->get_clock()->now();
+        trackedCoordinate.header.frame_id = "map";
+        trackedCoordinate.point.x = globalPath[closestIndex].x;
+        trackedCoordinate.point.y = globalPath[closestIndex].y;
+        trackedCoordinate.point.z = 0.0;
+        nearest_path_point_pub_->publish(trackedCoordinate);
+      }
     }
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
     rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr global_path_index_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_path_point_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
     std::shared_ptr<PathTracker> pathTracker;
 };

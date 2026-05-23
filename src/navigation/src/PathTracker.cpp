@@ -9,7 +9,7 @@ PathTracker::~PathTracker() {};
 
 void PathTracker::setVehiclePose(const navigation::VehiclePose& pose)
 {
-    vehiclePose = pose;
+    this->vehiclePose = pose;
 }
         
 void PathTracker::setGlobalPath(const std::vector<navigation::VehiclePose>& path)

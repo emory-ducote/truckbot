@@ -5,17 +5,16 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    spline_config = os.path.join(
+    pure_pursuit_config = os.path.join(
         get_package_share_directory('navigation'),
         'config',
-        'spline_generator.yaml'
+        'pure_pursuit.yaml'
     )
-
     return LaunchDescription([
         Node(
             package='navigation',
-            executable='spline_generator',
-            name='spline_generator_middleware',
-            parameters=[spline_config]
+            executable='pure_pursuit_controller',
+            name='pure_pursuit_controller_middleware',
+            parameters=[pure_pursuit_config]
         )
     ])

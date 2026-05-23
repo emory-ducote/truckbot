@@ -45,10 +45,19 @@ add_executable(simple_path_server
 target_link_libraries(simple_path_server)
 ament_target_dependencies(simple_path_server rclcpp nav_msgs geometry_msgs)
 
+add_executable(pure_pursuit_controller
+  src/PurePursuitControllerMiddleware.cpp
+  src/PurePursuitController.cpp
+)
+
+target_link_libraries(pure_pursuit_controller)
+ament_target_dependencies(pure_pursuit_controller rclcpp nav_msgs geometry_msgs std_msgs)
+
 install(TARGETS
   path_tracker
   spline_generator
   simple_path_server
+  pure_pursuit_controller
   DESTINATION lib/${PROJECT_NAME})
 
 

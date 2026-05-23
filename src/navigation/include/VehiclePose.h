@@ -26,6 +26,13 @@ struct VehiclePose {
         while (dtheta < -M_PI) dtheta += 2 * M_PI;
         return dtheta;
     }
+
+    VehiclePose differenceBetween(const VehiclePose& other) const {
+        double dx = x - other.x;
+        double dy = y - other.y;
+        double dtheta = theta - other.theta;
+        return VehiclePose(dx, dy, dtheta);
+    }
 };
 
 } 

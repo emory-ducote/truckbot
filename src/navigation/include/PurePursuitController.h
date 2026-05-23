@@ -1,30 +1,29 @@
-#ifndef PUREPURSUIT_H_
-#define PUREPURSUIT_H_
+#ifndef PUREPURSUITCONTROLLER_H_
+#define PUREPURSUITCONTROLLER_H_
 
 #include <cmath>
+#include <vector>
+#include "VehiclePose.h"
 
-class PurePursuit {
-public:
-    PurePursuit(double wheelbase) : L(wheelbase) {}
+class PurePursuitController {
+    public:
+        PurePursuitController(double lookaheadDistance);
+        ~PurePursuitController();
+        void setLookaheadDistance(const double distance);
+        double getLookaheadDistance() const;
+        void setGlobalPath(const std::vector<navigation::VehiclePose>& path);
+        void setVehiclePose(const navigation::VehiclePose& pose);
+        const navigation::VehiclePose& getVehiclePose() const;
+        void setLocalPath(const std::vector<navigation::VehiclePose>& path);
+        const std::vector<navigation::VehiclePose>& getLocalPath() const;
+        double computeControl(const navigation::VehiclePose localLookahead, const double v);
+        const navigation::VehiclePose& calculateLookaheadPoint();
+        navigation::VehiclePose localLookahead(const navigation::VehiclePose& globalLookahead);
+    private:
+        double lookaheadDistance;
+        navigation::VehiclePose vehiclePose;
+        std::vector<navigation::VehiclePose> localPath;
 
-    double computeControl(double x_l, double y_l,
-                        double v)
-    {
-        double Ld2 = x_l * x_l + y_l * y_l;
-
-        if (Ld2 == 0.0) {
-            return 0.0;
-        }
-
-        // curvature
-        double kappa = (2.0 * y_l) / Ld2;
-
-        // angular velocity (unicycle model)
-        return v * kappa;
-    }
-
-private:
-    double L; // wheelbase
 };
 
-#endif
+#endif // PUREPURSUITCONTROLLER_H_
