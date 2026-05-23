@@ -11,7 +11,7 @@ encoder_driver:
     right_front_b: 25
     right_rear_a: 8
     right_rear_b: 7
-    left_front_a: 1
-    left_front_b: 16
-    left_rear_a: 20
-    left_rear_b: 21
+    left_front_a: 16
+    left_front_b: 1
+    left_rear_a: 21
+    left_rear_b: 20

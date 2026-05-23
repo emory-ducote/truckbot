@@ -54,10 +54,10 @@ class EncoderDriverMiddleware : public rclcpp::Node {
           RCLCPP_INFO(this->get_logger(), "RIGHT FRONT: %f, RIGHT REAR %f", rightFrontWheelSpeed, rightRearWheelSpeed);
 
 
-          // auto rightWheelSpeed = (rightFrontWheelSpeed + rightRearWheelSpeed) / 2;
-          // auto leftWheelSpeed = (leftFrontWheelSpeed + leftRearWheelSpeed) / 2;
-          auto rightWheelSpeed = rightFrontWheelSpeed;
-          auto leftWheelSpeed = -rightRearWheelSpeed;
+          auto rightWheelSpeed = (rightFrontWheelSpeed + rightRearWheelSpeed) / 2;
+          auto leftWheelSpeed = (leftFrontWheelSpeed + leftRearWheelSpeed) / 2;
+          // auto rightWheelSpeed = rightFrontWheelSpeed;
+          // auto leftWheelSpeed = -rightRearWheelSpeed;
 
           // RCLCPP_INFO(this->get_logger(), "LEFT WHEEL: %f, RIGHT WHEEL %f", leftWheelSpeed, rightWheelSpeed);
           

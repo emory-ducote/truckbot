@@ -59,11 +59,22 @@ private:
 		try {
 			auto globalLookahead = purePursuitController->calculateLookaheadPoint();
 			auto localLookahead = purePursuitController->localLookahead(globalLookahead);
-			auto omega = purePursuitController->computeControl(localLookahead, 0.5);
+			auto omega = purePursuitController->computeControl(localLookahead, 0.3);
 			RCLCPP_INFO(this->get_logger(), "PurePursuit omega chosen: %f", omega);
 			geometry_msgs::msg::Twist cmd_msg;
-			cmd_msg.linear.x = 0.5;
-			cmd_msg.angular.z = omega;
+			double distance = purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead);
+			RCLCPP_INFO(this->get_logger(), "Dist from point: %f", distance);
+			if ((purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead) < 0.15) || (mission_done))
+			{
+				cmd_msg.linear.x = 0.0;
+				cmd_msg.angular.z = 0.0;
+				mission_done = true;
+			}
+			else
+			{
+				cmd_msg.linear.x = 0.15;
+				cmd_msg.angular.z = omega * 10;
+			}
 			cmd_vel_pub_->publish(cmd_msg);
 			
 			// Publish global lookahead point for debugging
@@ -95,6 +106,7 @@ private:
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr local_lookahead_pub_;
 	rclcpp::TimerBase::SharedPtr timer_;
 	std::shared_ptr<PurePursuitController> purePursuitController;
+	bool mission_done = false;
 };
 
 int main(int argc, char * argv[])
