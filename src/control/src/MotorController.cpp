@@ -54,7 +54,6 @@ MotorController::MotorController(const uint8_t& chip,
 
     // Start PID control thread
     controlRunning = true;
-    int debugCounter = 0;
     controlThread = std::thread([this]() {
             const double loopHz = 20.0; // 20 Hz control loop
             const std::chrono::milliseconds period((int)(1000.0/loopHz));
@@ -68,29 +67,6 @@ MotorController::MotorController(const uint8_t& chip,
             const double integralLimit = 10.0;
 
             while (controlRunning) {
-                // Debug output at 2 Hz (every 10 control iterations)
-                if (++debugCounter % 10 == 0)
-                {
-                    std::cout
-                        << "[PID] "
-                        << "FL: target=" << desiredFL
-                        << " measured=" << measuredFracFL
-                        << " err=" << errFL
-                        << " cmd=" << outFL
-                        << " | FR: target=" << desiredFR
-                        << " measured=" << measuredFracFR
-                        << " err=" << errFR
-                        << " cmd=" << outFR
-                        << " | RL: target=" << desiredRL
-                        << " measured=" << measuredFracRL
-                        << " err=" << errRL
-                        << " cmd=" << outRL
-                        << " | RR: target=" << desiredRR
-                        << " measured=" << measuredFracRR
-                        << " err=" << errRR
-                        << " cmd=" << outRR
-                        << std::endl;
-                }
                 // Read measured wheel speeds populated by middleware (m/s)
                 double mFL = measuredFL.load();
                 double mFR = measuredFR.load();
