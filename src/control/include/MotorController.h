@@ -59,8 +59,8 @@ class MotorController {
         std::mutex pidMutex;
 
         // PID gains (tunable)
-        double Kp = 1.2;
-        double Ki = 0.5;
+        double Kp = 1.0;
+        double Ki = 0.25;
         double Kd = 0.01;
         
         // setters/getters for measured values (called by middleware subscriptions)

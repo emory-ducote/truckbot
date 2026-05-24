@@ -64,7 +64,7 @@ private:
 			geometry_msgs::msg::Twist cmd_msg;
 			double distance = purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead);
 			RCLCPP_INFO(this->get_logger(), "Dist from point: %f", distance);
-			if ((purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead) < 0.3) || (mission_done))
+			if ((purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead) < 0.1) || (mission_done))
 			{
 				cmd_msg.linear.x = 0.0;
 				cmd_msg.angular.z = 0.0;

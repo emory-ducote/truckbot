@@ -136,7 +136,7 @@ MotorController::~MotorController()
 bool MotorController::applySpeedCommand(double linearX, double angularZ)
 {
     // Angular scaling factor - tune this to adjust turn responsiveness
-    double angularScaleFactor = 3;
+    double angularScaleFactor = 1.75;
     
     // Wheelbase in meters (8 inches ≈ 0.2032 m)
     const double wheelbase = 0.2032;
