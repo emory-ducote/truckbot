@@ -4,35 +4,37 @@
 #include <unistd.h>
 #include <algorithm>
 #include "MotorController.h"
+#include <thread>
+#include <chrono>
 
 MotorController::MotorController(const uint8_t& chip, 
-                                 const uint8_t& leftFrontOne,
-                                 const uint8_t& leftFrontTwo,
-                                 const uint8_t& leftRearOne,
-                                 const uint8_t& leftRearTwo,
-                                 const uint8_t& rightFrontOne,
-                                 const uint8_t& rightFrontTwo,
-                                 const uint8_t& rightRearOne,
-                                 const uint8_t& rightRearTwo,
-                                 const uint8_t& liftOne,
-                                 const uint8_t& liftTwo,
-                                 const double& vehicleWidth,
-                                 const double& wheelRadius, 
-                                 const int& maxWheelMotorRpm)
-    : chip(chip), 
-      leftFrontOne(leftFrontOne), 
-      leftFrontTwo(leftFrontTwo), 
-      leftRearOne(leftRearOne), 
-      leftRearTwo(leftRearTwo), 
-      rightFrontOne(rightFrontOne), 
-      rightFrontTwo(rightFrontTwo),
-      rightRearOne(rightRearOne),
-      rightRearTwo(rightRearTwo),
-      liftOne(liftOne),
-      liftTwo(liftTwo),
-      vehicleWidth(vehicleWidth),
-      wheelRadius(wheelRadius),
-      maxWheelMotorRpm(maxWheelMotorRpm)
+                                                                 const uint8_t& leftFrontOne,
+                                                                 const uint8_t& leftFrontTwo,
+                                                                 const uint8_t& leftRearOne,
+                                                                 const uint8_t& leftRearTwo,
+                                                                 const uint8_t& rightFrontOne,
+                                                                 const uint8_t& rightFrontTwo,
+                                                                 const uint8_t& rightRearOne,
+                                                                 const uint8_t& rightRearTwo,
+                                                                 const uint8_t& liftOne,
+                                                                 const uint8_t& liftTwo,
+                                                                 const double& vehicleWidth,
+                                                                 const double& wheelRadius, 
+                                                                 const int& maxWheelMotorRpm)
+                : chip(chip), 
+                    leftFrontOne(leftFrontOne), 
+                    leftFrontTwo(leftFrontTwo), 
+                    leftRearOne(leftRearOne), 
+                    leftRearTwo(leftRearTwo), 
+                    rightFrontOne(rightFrontOne), 
+                    rightFrontTwo(rightFrontTwo),
+                    rightRearOne(rightRearOne),
+                    rightRearTwo(rightRearTwo),
+                    liftOne(liftOne),
+                    liftTwo(liftTwo),
+                    vehicleWidth(vehicleWidth),
+                    wheelRadius(wheelRadius),
+                    maxWheelMotorRpm(maxWheelMotorRpm)
 { 
     handle = lgGpiochipOpen(chip);
     if (handle < 0) {
@@ -50,10 +52,106 @@ MotorController::MotorController(const uint8_t& chip,
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftOne, 0);
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, liftTwo, 0);
 
+    // Start PID control thread
+    controlRunning = true;
+    int debugCounter = 0;
+    controlThread = std::thread([this]() {
+            const double loopHz = 20.0; // 20 Hz control loop
+            const std::chrono::milliseconds period((int)(1000.0/loopHz));
+            double dt = 1.0 / loopHz;
+
+            // max linear speed (m/s) from motor rpm
+            double maxLinearSpeed = (static_cast<double>(maxWheelMotorRpm) * 2.0 * M_PI / 60.0) * wheelRadius;
+
+            double prevErrFL = 0.0, prevErrFR = 0.0, prevErrRL = 0.0, prevErrRR = 0.0;
+            double intFL = 0.0, intFR = 0.0, intRL = 0.0, intRR = 0.0;
+            const double integralLimit = 10.0;
+
+            while (controlRunning) {
+                // Debug output at 2 Hz (every 10 control iterations)
+                if (++debugCounter % 10 == 0)
+                {
+                    std::cout
+                        << "[PID] "
+                        << "FL: target=" << desiredFL
+                        << " measured=" << measuredFracFL
+                        << " err=" << errFL
+                        << " cmd=" << outFL
+                        << " | FR: target=" << desiredFR
+                        << " measured=" << measuredFracFR
+                        << " err=" << errFR
+                        << " cmd=" << outFR
+                        << " | RL: target=" << desiredRL
+                        << " measured=" << measuredFracRL
+                        << " err=" << errRL
+                        << " cmd=" << outRL
+                        << " | RR: target=" << desiredRR
+                        << " measured=" << measuredFracRR
+                        << " err=" << errRR
+                        << " cmd=" << outRR
+                        << std::endl;
+                }
+                // Read measured wheel speeds populated by middleware (m/s)
+                double mFL = measuredFL.load();
+                double mFR = measuredFR.load();
+                double mRL = measuredRL.load();
+                double mRR = measuredRR.load();
+
+                double measuredFracFL = mFL / maxLinearSpeed;
+                double measuredFracFR = mFR / maxLinearSpeed;
+                double measuredFracRL = mRL / maxLinearSpeed;
+                double measuredFracRR = mRR / maxLinearSpeed;
+
+                double desiredFL = targetFL.load();
+                double desiredFR = targetFR.load();
+                double desiredRL = targetRL.load();
+                double desiredRR = targetRR.load();
+
+                double errFL = desiredFL - measuredFracFL;
+                double errFR = desiredFR - measuredFracFR;
+                double errRL = desiredRL - measuredFracRL;
+                double errRR = desiredRR - measuredFracRR;
+
+                intFL += errFL * dt; intFR += errFR * dt; intRL += errRL * dt; intRR += errRR * dt;
+                // clamp integrals
+                intFL = std::max(-integralLimit, std::min(integralLimit, intFL));
+                intFR = std::max(-integralLimit, std::min(integralLimit, intFR));
+                intRL = std::max(-integralLimit, std::min(integralLimit, intRL));
+                intRR = std::max(-integralLimit, std::min(integralLimit, intRR));
+
+                double dFL = (errFL - prevErrFL) / dt;
+                double dFR = (errFR - prevErrFR) / dt;
+                double dRL = (errRL - prevErrRL) / dt;
+                double dRR = (errRR - prevErrRR) / dt;
+
+                double outFL = Kp * errFL + Ki * intFL + Kd * dFL;
+                double outFR = Kp * errFR + Ki * intFR + Kd * dFR;
+                double outRL = Kp * errRL + Ki * intRL + Kd * dRL;
+                double outRR = Kp * errRR + Ki * intRR + Kd * dRR;
+
+                // clamp outputs
+                outFL = std::max(-1.0, std::min(1.0, outFL));
+                outFR = std::max(-1.0, std::min(1.0, outFR));
+                outRL = std::max(-1.0, std::min(1.0, outRL));
+                outRR = std::max(-1.0, std::min(1.0, outRR));
+
+                // Send commands to motors
+                setMotorSpeeds(outFL, outFR, outRL, outRR);
+
+                prevErrFL = errFL; prevErrFR = errFR; prevErrRL = errRL; prevErrRR = errRR;
+
+                std::this_thread::sleep_for(period);
+            }
+        });
+
 }
 
 MotorController::~MotorController()
 {
+    // Stop control thread if running
+    controlRunning = false;
+    if (controlThread.joinable()) controlThread.join();
+
     setMotorSpeed(0.0, 0.0);
     usleep(10000);
     lgGpiochipClose(handle);
@@ -102,35 +200,24 @@ bool MotorController::applySpeedCommand(double linearX, double angularZ)
             std::max(std::abs(rearRightVel), minWheelSpeed),
             rearRightVel);
 
-    // Convert m/s → RPM
-    frontLeftVel /= wheelRadius;
-    frontRightVel /= wheelRadius;
-    rearLeftVel /= wheelRadius;
-    rearRightVel /= wheelRadius;
+    // Convert desired linear wheel speeds (m/s) into normalized fraction [-1,1]
+    double maxLinearSpeed = (static_cast<double>(maxWheelMotorRpm) * 2.0 * M_PI / 60.0) * wheelRadius;
 
-    frontLeftVel *= (60.0/(2.0*M_PI));
-    frontRightVel *= (60.0/(2.0*M_PI));
-    rearLeftVel *= (60.0/(2.0*M_PI));
-    rearRightVel *= (60.0/(2.0*M_PI));
+    double flNorm = std::max(-1.0, std::min(1.0, frontLeftVel / maxLinearSpeed));
+    double frNorm = std::max(-1.0, std::min(1.0, frontRightVel / maxLinearSpeed));
+    double rlNorm = std::max(-1.0, std::min(1.0, rearLeftVel / maxLinearSpeed));
+    double rrNorm = std::max(-1.0, std::min(1.0, rearRightVel / maxLinearSpeed));
 
-    double scaleFactor =
-        std::min(1.0,
-            maxWheelMotorRpm /
-            std::max({std::abs(frontLeftVel),
-                      std::abs(frontRightVel),
-                      std::abs(rearLeftVel),
-                      std::abs(rearRightVel)}));
+    // Publish targets to PID controller (if running) else directly command motors
+    targetFL.store(flNorm);
+    targetFR.store(frNorm);
+    targetRL.store(rlNorm);
+    targetRR.store(rrNorm);
 
-    frontLeftVel *= scaleFactor;
-    frontRightVel *= scaleFactor;
-    rearLeftVel *= scaleFactor;
-    rearRightVel *= scaleFactor;
-
-    setMotorSpeeds(
-        frontLeftVel/maxWheelMotorRpm,
-        frontRightVel/maxWheelMotorRpm,
-        rearLeftVel/maxWheelMotorRpm,
-        rearRightVel/maxWheelMotorRpm);
+    // If no encoders/pid thread, directly set motor outputs
+    if (!controlRunning) {
+        setMotorSpeeds(flNorm, frNorm, rlNorm, rrNorm);
+    }
 
     return true;
 }

@@ -10,6 +10,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 class MotorControllerMiddleware : public rclcpp::Node {
   public:
@@ -33,11 +34,26 @@ class MotorControllerMiddleware : public rclcpp::Node {
           std::string wheel_control_topic = this->declare_parameter<std::string>("wheel_control_topic", "/cmd_vel");
           std::string actuator_control_topic = this->declare_parameter<std::string>("actuator_control_topic", "/cmd_actuator");
 
-          // Construct MotorController using parameters
-          motorController = std::make_shared<MotorController>(chip,
+            // Construct MotorController using parameters
+            motorController = std::make_shared<MotorController>(chip,
               leftFrontOne, leftFrontTwo, leftRearOne, leftRearTwo,
               rightFrontOne, rightFrontTwo, rightRearOne, rightRearTwo,
               liftOne, liftTwo, vehicleWidth, wheelRadius, maxWheelMotorRpm);
+
+            // Subscribe to per-wheel encoder topics (published by EncoderDriverMiddleware)
+            std::string leftFrontTopic = this->declare_parameter<std::string>("left_front_encoder_topic", "/encoder/left_front");
+            std::string leftRearTopic = this->declare_parameter<std::string>("left_rear_encoder_topic", "/encoder/left_rear");
+            std::string rightFrontTopic = this->declare_parameter<std::string>("right_front_encoder_topic", "/encoder/right_front");
+            std::string rightRearTopic = this->declare_parameter<std::string>("right_rear_encoder_topic", "/encoder/right_rear");
+
+            left_front_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+              leftFrontTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ motorController->setMeasuredFL(msg->data); });
+            left_rear_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+              leftRearTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ motorController->setMeasuredRL(msg->data); });
+            right_front_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+              rightFrontTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ motorController->setMeasuredFR(msg->data); });
+            right_rear_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+              rightRearTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ motorController->setMeasuredRR(msg->data); });
 
           cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
               "/cmd_vel", 10, std::bind(&MotorControllerMiddleware::cmdVelCallback, this, std::placeholders::_1));
@@ -63,6 +79,10 @@ class MotorControllerMiddleware : public rclcpp::Node {
   
       rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
       rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr cmd_actuator_sub_;
+      rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr left_front_enc_sub_;
+      rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr left_rear_enc_sub_;
+      rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr right_front_enc_sub_;
+      rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr right_rear_enc_sub_;
       std::shared_ptr<MotorController> motorController;
 };
 
