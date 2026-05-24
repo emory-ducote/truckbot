@@ -61,18 +61,78 @@ MotorController::~MotorController()
 
 bool MotorController::applySpeedCommand(double linearX, double angularZ)
 {
-    double leftVel = linearX - (0.2 / 2) * angularZ;
-    double rightVel = linearX + (0.2 / 2) * angularZ;
-    leftVel = leftVel / wheelRadius;
-    rightVel = rightVel / wheelRadius;
-    leftVel = leftVel * (60 / (M_PI * 2));
-    rightVel = rightVel * (60 / (M_PI * 2));
-    double scaleFactor = std::min(1.0, maxWheelMotorRpm / std::max(std::abs(leftVel), std::abs(rightVel)));
-    leftVel = (leftVel * scaleFactor) / maxWheelMotorRpm;
-    rightVel = (rightVel * scaleFactor) / maxWheelMotorRpm;
-    this->setMotorSpeed(leftVel, rightVel);
-    return true;
+    // Angular scaling factor - tune this to adjust turn responsiveness
+    double angularScaleFactor = 3;
+    
+    // Wheelbase in meters (8 inches ≈ 0.2032 m)
+    const double wheelbase = 0.2032;
+    
+    // Account for different arc paths during turns
+    // Front wheels travel a longer arc, rear wheels a shorter arc
+    // Scale based on wheelbase and angular velocity
+    double frontScale = 1.0 + (wheelbase / vehicleWidth) * std::abs(angularZ) * 0.5;
+    double rearScale = 1.0 - (wheelbase / vehicleWidth) * std::abs(angularZ) * 0.5;
 
+    // Compute individual wheel velocities for skid steer with wheelbase compensation
+    double frontLeftVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor * frontScale;
+    double frontRightVel = linearX + (vehicleWidth/2.0) * angularZ * angularScaleFactor * frontScale;
+    double rearLeftVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor * rearScale;
+    double rearRightVel = linearX + (vehicleWidth/2.0) * angularZ * angularScaleFactor * rearScale;
+
+    // Optional minimum wheel command to overcome motor deadband
+    const double minWheelSpeed = 0.15;
+
+    if (std::abs(frontLeftVel) > 0.01)
+        frontLeftVel = std::copysign(
+            std::max(std::abs(frontLeftVel), minWheelSpeed),
+            frontLeftVel);
+
+    if (std::abs(frontRightVel) > 0.01)
+        frontRightVel = std::copysign(
+            std::max(std::abs(frontRightVel), minWheelSpeed),
+            frontRightVel);
+
+    if (std::abs(rearLeftVel) > 0.01)
+        rearLeftVel = std::copysign(
+            std::max(std::abs(rearLeftVel), minWheelSpeed),
+            rearLeftVel);
+
+    if (std::abs(rearRightVel) > 0.01)
+        rearRightVel = std::copysign(
+            std::max(std::abs(rearRightVel), minWheelSpeed),
+            rearRightVel);
+
+    // Convert m/s → RPM
+    frontLeftVel /= wheelRadius;
+    frontRightVel /= wheelRadius;
+    rearLeftVel /= wheelRadius;
+    rearRightVel /= wheelRadius;
+
+    frontLeftVel *= (60.0/(2.0*M_PI));
+    frontRightVel *= (60.0/(2.0*M_PI));
+    rearLeftVel *= (60.0/(2.0*M_PI));
+    rearRightVel *= (60.0/(2.0*M_PI));
+
+    double scaleFactor =
+        std::min(1.0,
+            maxWheelMotorRpm /
+            std::max({std::abs(frontLeftVel),
+                      std::abs(frontRightVel),
+                      std::abs(rearLeftVel),
+                      std::abs(rearRightVel)}));
+
+    frontLeftVel *= scaleFactor;
+    frontRightVel *= scaleFactor;
+    rearLeftVel *= scaleFactor;
+    rearRightVel *= scaleFactor;
+
+    setMotorSpeeds(
+        frontLeftVel/maxWheelMotorRpm,
+        frontRightVel/maxWheelMotorRpm,
+        rearLeftVel/maxWheelMotorRpm,
+        rearRightVel/maxWheelMotorRpm);
+
+    return true;
 }
 
 bool MotorController::moveActuator(const bool direction)
@@ -135,6 +195,85 @@ bool MotorController::setMotorSpeed(const double left, const double right)
     {
         lgTxPwm(handle, rightFrontOne, 100, 0, 0, 0);
         lgTxPwm(handle, rightFrontTwo, 100, 0, 0, 0);
+        lgTxPwm(handle, rightRearOne, 100, 0, 0, 0);
+        lgTxPwm(handle, rightRearTwo, 100, 0, 0, 0);
+    }
+    
+    return true;
+}
+
+bool MotorController::setMotorSpeeds(const double frontLeft, const double frontRight, 
+                                      const double rearLeft, const double rearRight)
+{
+    double flPWM = speedToPWM(frontLeft);
+    double frPWM = speedToPWM(frontRight);
+    double rlPWM = speedToPWM(rearLeft);
+    double rrPWM = speedToPWM(rearRight);
+
+    // Front left
+    if (frontLeft > 0) 
+    {
+        lgTxPwm(handle, leftFrontOne, 100, 0, 0, 0);
+        lgTxPwm(handle, leftFrontTwo, 100, flPWM, 0, 0);
+    }
+    else if (frontLeft < 0)
+    {
+        lgTxPwm(handle, leftFrontOne, 100, flPWM, 0, 0);
+        lgTxPwm(handle, leftFrontTwo, 100, 0, 0, 0);
+    }
+    else 
+    {
+        lgTxPwm(handle, leftFrontOne, 100, 0, 0, 0);
+        lgTxPwm(handle, leftFrontTwo, 100, 0, 0, 0);
+    }
+
+    // Front right
+    if (frontRight > 0)
+    {
+        lgTxPwm(handle, rightFrontOne, 100, 0, 0, 0);
+        lgTxPwm(handle, rightFrontTwo, 100, frPWM, 0, 0);
+    }
+    else if (frontRight < 0)
+    {
+        lgTxPwm(handle, rightFrontOne, 100, frPWM, 0, 0);
+        lgTxPwm(handle, rightFrontTwo, 100, 0, 0, 0);
+    }
+    else 
+    {
+        lgTxPwm(handle, rightFrontOne, 100, 0, 0, 0);
+        lgTxPwm(handle, rightFrontTwo, 100, 0, 0, 0);
+    }
+
+    // Rear left
+    if (rearLeft > 0) 
+    {
+        lgTxPwm(handle, leftRearOne, 100, 0, 0, 0);
+        lgTxPwm(handle, leftRearTwo, 100, rlPWM, 0, 0);
+    }
+    else if (rearLeft < 0)
+    {
+        lgTxPwm(handle, leftRearOne, 100, rlPWM, 0, 0);
+        lgTxPwm(handle, leftRearTwo, 100, 0, 0, 0);
+    }
+    else 
+    {
+        lgTxPwm(handle, leftRearOne, 100, 0, 0, 0);
+        lgTxPwm(handle, leftRearTwo, 100, 0, 0, 0);
+    }
+
+    // Rear right
+    if (rearRight > 0)
+    {
+        lgTxPwm(handle, rightRearOne, 100, 0, 0, 0);
+        lgTxPwm(handle, rightRearTwo, 100, rrPWM, 0, 0);
+    }
+    else if (rearRight < 0)
+    {
+        lgTxPwm(handle, rightRearOne, 100, rrPWM, 0, 0);
+        lgTxPwm(handle, rightRearTwo, 100, 0, 0, 0);
+    }
+    else 
+    {
         lgTxPwm(handle, rightRearOne, 100, 0, 0, 0);
         lgTxPwm(handle, rightRearTwo, 100, 0, 0, 0);
     }

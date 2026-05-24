@@ -41,6 +41,8 @@ class MotorController {
         const int maxWheelMotorRpm;
         
         bool setMotorSpeed(const double left, const double right);
+        bool setMotorSpeeds(const double frontLeft, const double frontRight, 
+                           const double rearLeft, const double rearRight);
         double speedToPWM(const double speed);
 };
 

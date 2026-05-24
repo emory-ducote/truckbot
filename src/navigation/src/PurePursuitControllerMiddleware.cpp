@@ -59,12 +59,12 @@ private:
 		try {
 			auto globalLookahead = purePursuitController->calculateLookaheadPoint();
 			auto localLookahead = purePursuitController->localLookahead(globalLookahead);
-			auto omega = purePursuitController->computeControl(localLookahead, 0.3);
+			auto omega = purePursuitController->computeControl(localLookahead, 0.15);
 			RCLCPP_INFO(this->get_logger(), "PurePursuit omega chosen: %f", omega);
 			geometry_msgs::msg::Twist cmd_msg;
 			double distance = purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead);
 			RCLCPP_INFO(this->get_logger(), "Dist from point: %f", distance);
-			if ((purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead) < 0.15) || (mission_done))
+			if ((purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead) < 0.3) || (mission_done))
 			{
 				cmd_msg.linear.x = 0.0;
 				cmd_msg.angular.z = 0.0;
@@ -73,7 +73,7 @@ private:
 			else
 			{
 				cmd_msg.linear.x = 0.15;
-				cmd_msg.angular.z = omega * 10;
+				cmd_msg.angular.z = omega;
 			}
 			cmd_vel_pub_->publish(cmd_msg);
 			
