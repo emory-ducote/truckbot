@@ -23,21 +23,6 @@ class MotorController {
                         const double& vehicleWidth,
                         const double& wheelRadius, 
                         const int& maxWheelMotorRpm);
-        // single constructor (no direct encoder ownership)
-        MotorController(const uint8_t& chip, 
-                const uint8_t& leftFrontOne,
-                const uint8_t& leftFrontTwo,
-                const uint8_t& leftRearOne,
-                const uint8_t& leftRearTwo,
-                const uint8_t& rightFrontOne,
-                const uint8_t& rightFrontTwo,
-                const uint8_t& rightRearOne,
-                const uint8_t& rightRearTwo,
-                const uint8_t& liftOne,
-                const uint8_t& liftTwo,
-                const double& vehicleWidth,
-                const double& wheelRadius, 
-                const int& maxWheelMotorRpm);
         ~MotorController();
         bool applySpeedCommand(double linearX, double angularZ);
         bool moveActuator(const bool direction);

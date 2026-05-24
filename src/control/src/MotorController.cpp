@@ -60,7 +60,7 @@ MotorController::MotorController(const uint8_t& chip,
             double dt = 1.0 / loopHz;
 
             // max linear speed (m/s) from motor rpm
-            double maxLinearSpeed = (static_cast<double>(maxWheelMotorRpm) * 2.0 * M_PI / 60.0) * wheelRadius;
+            double maxLinearSpeed = (static_cast<double>(this->maxWheelMotorRpm) * 2.0 * M_PI / 60.0) * this->wheelRadius;
 
             double prevErrFL = 0.0, prevErrFR = 0.0, prevErrRL = 0.0, prevErrRR = 0.0;
             double intFL = 0.0, intFR = 0.0, intRL = 0.0, intRR = 0.0;
@@ -177,7 +177,7 @@ bool MotorController::applySpeedCommand(double linearX, double angularZ)
             rearRightVel);
 
     // Convert desired linear wheel speeds (m/s) into normalized fraction [-1,1]
-    double maxLinearSpeed = (static_cast<double>(maxWheelMotorRpm) * 2.0 * M_PI / 60.0) * wheelRadius;
+    double maxLinearSpeed = (static_cast<double>(this->maxWheelMotorRpm) * 2.0 * M_PI / 60.0) * this->wheelRadius;
 
     double flNorm = std::max(-1.0, std::min(1.0, frontLeftVel / maxLinearSpeed));
     double frNorm = std::max(-1.0, std::min(1.0, frontRightVel / maxLinearSpeed));
