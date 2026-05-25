@@ -1,8 +1,9 @@
 encoder_driver:
   ros__parameters:
     wheel_radius: 0.05 # meters
-    encoder_cpr: 700
-    encoder_multiplier: 4 # gearbox shaft resolution in X4 mode
+    wheel_separation: 0.2 # meters
+    encoder_cpr: 700 # count
+    encoder_ticks_per_revolution: 4 # ticks
     encoder_odometry_topic: "/odom"
 
     # pin assignments

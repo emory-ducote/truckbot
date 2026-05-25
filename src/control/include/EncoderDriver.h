@@ -5,6 +5,7 @@
 #include <lgpio.h>
 #include <unordered_map>
 #include <atomic>
+#include <chrono>
 
 class EncoderDriver {
     public:
@@ -16,7 +17,7 @@ class EncoderDriver {
                       const int& encoderTicksPerRevolution);
         ~EncoderDriver();
         void handleEdgeChange();
-        float getWheelSpeeds(float dt);  
+        float getWheelSpeeds(float desiredDt);  
         
     private:
         const uint8_t chip;
@@ -28,6 +29,7 @@ class EncoderDriver {
         std::atomic<int> encoderTicks;
         int lastEncoderTicks;
         int lastEncoderRead;
+        double previousCalculationStamp;
         int handle;     
 };
 
