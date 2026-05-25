@@ -68,7 +68,6 @@ class EncoderDriverMiddleware : public rclcpp::Node {
           
           auto message = geometry_msgs::msg::Twist();
 
-          //TODO:  this is wrong but seems to makes things work  
           message.linear.x = (rightWheelSpeed + leftWheelSpeed) / 2; // should be / 2 - hm
           message.angular.z = (rightWheelSpeed - leftWheelSpeed) / wheelSeparation;
           std_msgs::msg::Float64 m;
@@ -76,7 +75,7 @@ class EncoderDriverMiddleware : public rclcpp::Node {
           m.data = leftRearWheelSpeed; left_rear_pub_->publish(m);
           m.data = rightFrontWheelSpeed; right_front_pub_->publish(m);
           m.data = rightRearWheelSpeed; right_rear_pub_->publish(m);
-	  odom_publisher_->publish(message);
+	        odom_publisher_->publish(message);
         }
 
         std::shared_ptr<EncoderDriver> rightFront;
