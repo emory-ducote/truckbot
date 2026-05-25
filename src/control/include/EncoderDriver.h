@@ -4,8 +4,7 @@
 #include <cstdint>
 #include <lgpio.h>
 #include <unordered_map>
-
-
+#include <atomic>
 
 class EncoderDriver {
     public:
@@ -14,7 +13,7 @@ class EncoderDriver {
                       const uint8_t& pinB,
                       const double& wheelRadius,
                       const int& encoderCPR,
-                      const int& encoderMultiplier);
+                      const int& encoderTicksPerRevolution);
         ~EncoderDriver();
         void handleEdgeChange();
         float getWheelSpeeds(float dt);  
@@ -25,10 +24,10 @@ class EncoderDriver {
         const uint8_t pinB;
         const double wheelRadius;
         const int encoderCPR;
-        const int encoderMultiplier;
-        long encoderCount;
-        long lastEncoderCount;
-        int lastEncoded;
+        const int encoderTicksPerRevolution;
+        std::atomic<int> encoderTicks;
+        int lastEncoderTicks;
+        int lastEncoderRead;
         int handle;     
 };
 
