@@ -13,14 +13,14 @@ EncoderDriver::EncoderDriver(const uint8_t& chip,
                              const uint8_t& pinB,
                              const double& wheelRadius,
                              const int& encoderCPR,
-                             const int& encoderMultiplier)
+                             const int& encoderTicksPerRevolution)
     : chip(chip), 
       pinA(pinA), 
       pinB(pinB),
       wheelRadius(wheelRadius),
       encoderCPR(encoderCPR),
-      encoderMultiplier(encoderMultiplier),
-      encoderCount(0),
+      encoderTicksPerRevolution(encoderTicksPerRevolution),
+      encoderTicks(0),
       lastEncoded(0)
     { 
     handle = lgGpiochipOpen(chip);
@@ -48,22 +48,23 @@ void EncoderDriver::handleEdgeChange()
     int MSB = lgGpioRead(handle, pinA);
     int LSB = lgGpioRead(handle, pinB);
 
-    int encoded = (MSB << 1) | LSB;
-    int sum = (lastEncoded << 2) | encoded;
+    int currentEncoderRead = (MSB << 1) | LSB;
+    int encoderEdgeChange = (lastEncoderRead << 2) | currentEncoderRead;
 
-    if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011)
-        encoderCount++;
-    else if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000)
-        encoderCount--;
+    if (encoderEdgeChange == 0b1101 || encoderEdgeChange == 0b0100 || encoderEdgeChange == 0b0010 || encoderEdgeChange == 0b1011)
+        encoderTicks++;
+    else if (encoderEdgeChange == 0b1110 || encoderEdgeChange == 0b0111 || encoderEdgeChange == 0b0001 || encoderEdgeChange == 0b1000)
+        encoderTicks--;
 
-    lastEncoded = encoded;
+    lastEncoderRead = currentEncoderRead;
 }
 
 float EncoderDriver::getWheelSpeeds(float dt)
 {
-    float deltaCount = static_cast<float>(encoderCount - lastEncoderCount) / (encoderCPR * encoderMultiplier);
-    float omega  = (deltaCount  * 2.0 * M_PI) / dt; // rad/s
-    float vel    = omega  * wheelRadius; // m/s
-    lastEncoderCount = encoderCount;
+    float rotations = static_cast<float>(encoderTicks - lastEncoderTicks) 
+                                      / (encoderCPR * encoderTicksPerRevolution);
+    float omega  = (rotations * 2.0 * M_PI) / dt; // rad/s
+    float vel = omega  * wheelRadius; // m/s
+    lastEncoderTicks = encoderTicks;
     return vel;
 }
