@@ -49,11 +49,11 @@ void EncoderDriver::handleEdgeChange()
     int LSB = lgGpioRead(handle, pinB);
 
     int currentEncoderRead = (MSB << 1) | LSB;
-    int sum = (lastEncoderRead << 2) | currentEncoderRead;
+    int encoderEdgeChange = (lastEncoderRead << 2) | currentEncoderRead;
 
-    if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011)
+    if (encoderEdgeChange == 0b1101 || encoderEdgeChange == 0b0100 || encoderEdgeChange == 0b0010 || encoderEdgeChange == 0b1011)
         encoderTicks++;
-    else if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000)
+    else if (encoderEdgeChange == 0b1110 || encoderEdgeChange == 0b0111 || encoderEdgeChange == 0b0001 || encoderEdgeChange == 0b1000)
         encoderTicks--;
 
     lastEncoderRead = currentEncoderRead;
