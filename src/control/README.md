@@ -51,9 +51,9 @@ ros2 run control motor_controller
   - (Add any configurable parameters here)
 
 ## Source Structure
-- `include/MotorController.h`: Motor controller class
-- `src/MotorController.cpp`: Motor controller implementation
-- `src/MotorControllerMiddleware.cpp`: ROS2 node for receiving control commands
+- `include/MotorDriver.h`: Motor controller class
+- `src/MotorDriver.cpp`: Motor controller implementation
+- `src/MotorDriverMiddleware.cpp`: ROS2 node for receiving control commands
 - `src/TeleOp.cpp`: ROS2 node for receiving joystick input and forwarding it
 
 ## Maintainer

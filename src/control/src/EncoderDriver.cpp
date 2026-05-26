@@ -21,9 +21,12 @@ EncoderDriver::EncoderDriver(const uint8_t& chip,
       encoderCPR(encoderCPR),
       encoderTicksPerRevolution(encoderTicksPerRevolution),
       encoderTicks(0),
-      lastEncoderRead(0),
-      previousCalculationStamp(0.0)
-    { 
+      lastEncoderRead(0)
+{ 
+    previousCalculationStamp = std::chrono::duration<double>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();    
+
     handle = lgGpiochipOpen(chip);
     if (handle < 0) {
         fprintf(stderr, "Error opening GPIO chip %d\n", chip);
@@ -60,16 +63,12 @@ void EncoderDriver::handleEdgeChange()
     lastEncoderRead = currentEncoderRead;
 }
 
-float EncoderDriver::getWheelSpeeds(float desiredDt)
+float EncoderDriver::getWheelSpeeds()
 {
-    double dt = desiredDt;
     double curTime = std::chrono::duration<double>(
             std::chrono::system_clock::now().time_since_epoch()
         ).count();
-    if (previousCalculationStamp != 0.0)
-    {
-        dt = curTime - previousCalculationStamp;
-    }
+    double dt = curTime - previousCalculationStamp;
     std::cout << "DT: " << dt << std::endl;
     float rotations = static_cast<float>(encoderTicks - lastEncoderTicks) 
                                       / (encoderCPR * encoderTicksPerRevolution);

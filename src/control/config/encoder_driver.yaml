@@ -5,6 +5,9 @@ encoder_driver:
     encoder_cpr: 700 # count
     encoder_ticks_per_revolution: 4 # ticks
     encoder_odometry_topic: "/odom"
+    Kp: 1.25
+    Ki: 0.0
+    Kd: 0.0
 
     # pin assignments
     chip: 4
