@@ -63,7 +63,7 @@ void EncoderDriver::handleEdgeChange()
     lastEncoderRead = currentEncoderRead;
 }
 
-float EncoderDriver::getWheelSpeeds()
+double EncoderDriver::getWheelSpeeds()
 {
     double curTime = std::chrono::duration<double>(
             std::chrono::system_clock::now().time_since_epoch()

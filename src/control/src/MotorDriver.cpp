@@ -10,9 +10,9 @@
 MotorDriver::MotorDriver(const uint8_t& chip, 
                          const uint8_t& pinOne,
                          const uint8_t& pinTwo,
-                         const double Kp = 1.25,
-                         const double Ki = 0.0,
-                         const double Kd = 0.0)
+                         const double Kp,
+                         const double Ki,
+                         const double Kd)
                          : chip(chip), 
                            pinOne(pinOne), 
                            pinTwo(pinTwo), 
@@ -30,7 +30,7 @@ MotorDriver::MotorDriver(const uint8_t& chip,
     if (handle < 0) {
         fprintf(stderr, "Error opening GPIO chip %d\n", chip);
     }
-
+    std::cout << "PIN: " << pinOne << "," << pinTwo << std::endl;
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, pinOne, 0);
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, pinTwo, 0);
 }
@@ -54,20 +54,20 @@ void MotorDriver::setMotorSpeed(const double targetSpeed, const bool usePID)
         double errorSpeed = targetSpeed - measuredSpeed.load();
         integralSpeed += errorSpeed * dt;
         double derivativeSpeed = (errorSpeed - prevErrorSpeed) / dt;
-        double speed = Kp * errorSpeed + 
+        speed = Kp * errorSpeed + 
                        Ki * integralSpeed + 
                        Kd * derivativeSpeed;
         prevErrorSpeed = errorSpeed; 
     }
 
     double PWM = speedToPWM(speed);
-    if (PWM > 0) 
+    if (speed > 0) 
     {
         lgTxPwm(handle, pinOne, 100, 0, 0, 0);
         lgTxPwm(handle, pinTwo, 100, PWM, 0, 0);
 
     }
-    else if (PWM < 0)
+    else if (speed < 0)
     {
         lgTxPwm(handle, pinOne, 100, PWM, 0, 0);
         lgTxPwm(handle, pinTwo, 100, 0, 0, 0);

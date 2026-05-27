@@ -12,9 +12,9 @@ class MotorDriver {
         MotorDriver(const uint8_t& chip, 
                     const uint8_t& pinOne,
                     const uint8_t& pinTwo,
-                    const double Kp,
-                    const double Ki,
-                    const double Kd);
+                    const double Kp = 1.25,
+                    const double Ki = 0.0,
+                    const double Kd = 0.0);
         ~MotorDriver();
         void setMeasuredSpeed(double v) { measuredSpeed.store(v); }
         double getMeasuredSpeed() const { return measuredSpeed.load(); }

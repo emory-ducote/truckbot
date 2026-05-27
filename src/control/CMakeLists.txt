@@ -31,13 +31,13 @@ ament_target_dependencies(teleop
 )
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-  add_executable(motor_controller 
+  add_executable(motor_driver 
     src/MotorDriverMiddleware.cpp
     src/MotorDriver.cpp
   )
 
-  target_link_libraries(motor_controller lgpio)
-  ament_target_dependencies(motor_controller rclcpp std_msgs sensor_msgs)
+  target_link_libraries(motor_driver lgpio)
+  ament_target_dependencies(motor_driver rclcpp std_msgs sensor_msgs)
 
   add_executable(encoder_driver
     src/EncoderDriverMiddleware.cpp
@@ -52,7 +52,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
   )
 
   install(TARGETS
-    motor_controller
+    motor_driver
     encoder_driver
     DESTINATION lib/${PROJECT_NAME})
 endif()

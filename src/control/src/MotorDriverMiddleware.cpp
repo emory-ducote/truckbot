@@ -17,8 +17,8 @@ class MotorDriverMiddleware : public rclcpp::Node {
       MotorDriverMiddleware() : Node("motor_driver_node")
       {
           // Declare hardware/config parameters
-          double vehicleWidth = this->declare_parameter<double>("vehicle_width", 0.2);
-          double wheelRadius = this->declare_parameter<double>("wheel_radius", 0.03);
+          vehicleWidth = this->declare_parameter<double>("vehicle_width", 0.2);
+          wheelRadius = this->declare_parameter<double>("wheel_radius", 0.03);
           int maxWheelMotorRpm = this->declare_parameter<int>("max_wheel_motor_rpm", 251);
           int chip = this->declare_parameter<int>("chip", 4);
           int rightFrontOne = this->declare_parameter<int>("right_front_one", 22);
@@ -31,9 +31,11 @@ class MotorDriverMiddleware : public rclcpp::Node {
           int leftRearTwo = this->declare_parameter<int>("left_rear_two", 18);
           int liftOne = this->declare_parameter<int>("lift_one", 17);
           int liftTwo = this->declare_parameter<int>("lift_two", 27);
-          int Kp = this->declare_parameter<double>("Kp", 1.25);
-          int Ki = this->declare_parameter<double>("Ki", 0.0);
-          int Kd = this->declare_parameter<double>("Kd", 0.0);
+          double Kp = this->declare_parameter<double>("Kp", 1.25);
+          double Ki = this->declare_parameter<double>("Ki", 0.0);
+          double Kd = this->declare_parameter<double>("Kd", 0.0);
+
+          RCLCPP_INFO(this->get_logger(), "KP, KI, KD: %f, %f, %f", Kp, Ki, Kd);
 
 
           std::string wheel_control_topic = this->declare_parameter<std::string>("wheel_control_topic", "/cmd_vel");
@@ -52,13 +54,13 @@ class MotorDriverMiddleware : public rclcpp::Node {
           std::string rightRearTopic = this->declare_parameter<std::string>("right_rear_encoder_topic", "/encoder/right_rear");
 
           left_front_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-            leftFrontTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ leftFront->setMeasuredFL(msg->data); });
+            leftFrontTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ leftFront->setMeasuredSpeed(msg->data); });
           left_rear_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-            leftRearTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ leftRear->setMeasuredRL(msg->data); });
+            leftRearTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ leftRear->setMeasuredSpeed(msg->data); });
           right_front_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-            rightFrontTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ rightFront->setMeasuredFR(msg->data); });
+            rightFrontTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ rightFront->setMeasuredSpeed(msg->data); });
           right_rear_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-            rightRearTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ rightRear->setMeasuredRR(msg->data); });
+            rightRearTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ rightRear->setMeasuredSpeed(msg->data); });
 
           cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
               wheel_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdVelCallback, this, std::placeholders::_1));
@@ -85,10 +87,12 @@ class MotorDriverMiddleware : public rclcpp::Node {
         double leftFrontVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor;
         double leftRearVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor;
 
-        rightFront->applySpeedCommand(rightFrontVel, true);
-        rightRear->applySpeedCommand(rightRearVel, true);
-        leftFront->applySpeedCommand(leftFrontVel, true);
-        leftRear->applySpeedCommand(leftRearVel, true);
+        rightFront->setMotorSpeed(rightFrontVel, true);
+        rightRear->setMotorSpeed(rightRearVel, true);
+        leftFront->setMotorSpeed(leftFrontVel, true);
+        leftRear->setMotorSpeed(leftRearVel, true);
+
+        CHANGE THIS TO BE A SEPARATE TIMER LOOP
 
       }
       void cmdActuatorCallback(const std_msgs::msg::Bool::SharedPtr msg) 
@@ -100,7 +104,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
         }
         else
         {
-          lift->setMotorSpeed(-1.0, false)
+          lift->setMotorSpeed(-1.0, false);
         }
         RCLCPP_INFO(this->get_logger(), "Received Actuator Command: enabled: %d", actuatorEnabled);
       }
@@ -116,6 +120,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
       std::shared_ptr<MotorDriver> leftFront;
       std::shared_ptr<MotorDriver> leftRear;
       std::shared_ptr<MotorDriver> lift;
+      double vehicleWidth, wheelRadius;
 
 };
 

@@ -17,7 +17,7 @@ class EncoderDriver {
                       const int& encoderTicksPerRevolution);
         ~EncoderDriver();
         void handleEdgeChange();
-        float getWheelSpeeds();  
+        double getWheelSpeeds();  
         
     private:
         const uint8_t chip;

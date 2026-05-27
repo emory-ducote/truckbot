@@ -56,10 +56,10 @@ class EncoderDriverMiddleware : public rclcpp::Node {
     private:
         void timer_callback()
         {
-          auto rightFrontWheelSpeed = rightFront->getWheelSpeeds(0.10);
-          auto rightRearWheelSpeed = rightRear->getWheelSpeeds(0.10);
-          auto leftFrontWheelSpeed = leftFront->getWheelSpeeds(0.10);
-          auto leftRearWheelSpeed = leftRear->getWheelSpeeds(0.10);
+          auto rightFrontWheelSpeed = rightFront->getWheelSpeeds();
+          auto rightRearWheelSpeed = rightRear->getWheelSpeeds();
+          auto leftFrontWheelSpeed = leftFront->getWheelSpeeds();
+          auto leftRearWheelSpeed = leftRear->getWheelSpeeds();
 
           // RCLCPP_INFO(this->get_logger(), "LF: %f, LR: %f, RF: %f, RR: %f", leftFrontWheelSpeed, leftRearWheelSpeed, rightFrontWheelSpeed, rightRearWheelSpeed);
 
