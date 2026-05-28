@@ -6,8 +6,8 @@ motor_driver:
     wheel_control_topic: "/cmd_vel"
     actuator_control_topic: "/cmd_actuator"
     Kp: 2.0
-    Ki: 0.0
-    Kd: 0.0
+    Ki: 0.01
+    Kd: 0.001
 
     # wheel pins
     chip: 4

@@ -33,16 +33,20 @@ MotorDriver::MotorDriver(const uint8_t& chip,
     std::cout << "PIN: " << pinOne << "," << pinTwo << std::endl;
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, pinOne, 0);
     lgGpioClaimOutput(handle, LG_SET_PULL_NONE, pinTwo, 0);
+
+    setTargetSpeed(0.0);
+    updateMotorSpeed(true);
 }
 
 MotorDriver::~MotorDriver()
 {
-    setMotorSpeed(0.0, false);
+    setTargetSpeed(0.0);
+    updateMotorSpeed(true);
     usleep(10000);
     lgGpiochipClose(handle);
 }
 
-void MotorDriver::setMotorSpeed(const double targetSpeed, const bool usePID)
+void MotorDriver::updateMotorSpeed(const bool usePID)
 {
     double speed = targetSpeed;
     if (usePID)
@@ -53,6 +57,12 @@ void MotorDriver::setMotorSpeed(const double targetSpeed, const bool usePID)
         double dt = curTime - previousCalculationStamp;
         double errorSpeed = targetSpeed - measuredSpeed.load();
         integralSpeed += errorSpeed * dt;
+        const double integralLimit = 1.0;
+        integralSpeed = std::clamp(
+            integralSpeed,
+            -integralLimit,
+            integralLimit
+        );
         double derivativeSpeed = (errorSpeed - prevErrorSpeed) / dt;
         speed = Kp * errorSpeed + 
                        Ki * integralSpeed + 

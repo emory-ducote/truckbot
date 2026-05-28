@@ -66,6 +66,10 @@ class MotorDriverMiddleware : public rclcpp::Node {
               wheel_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdVelCallback, this, std::placeholders::_1));
           cmd_actuator_sub_ = this->create_subscription<std_msgs::msg::Bool>(
               actuator_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdActuatorCallback, this, std::placeholders::_1));
+
+          timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(10),
+            std::bind(&MotorDriverMiddleware::timer_callback, this));
       }
   
   private:
@@ -87,12 +91,10 @@ class MotorDriverMiddleware : public rclcpp::Node {
         double leftFrontVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor;
         double leftRearVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor;
 
-        rightFront->setMotorSpeed(rightFrontVel, true);
-        rightRear->setMotorSpeed(rightRearVel, true);
-        leftFront->setMotorSpeed(leftFrontVel, true);
-        leftRear->setMotorSpeed(leftRearVel, true);
-
-        CHANGE THIS TO BE A SEPARATE TIMER LOOP
+        rightFront->setTargetSpeed(rightFrontVel);
+        rightRear->setTargetSpeed(rightRearVel);
+        leftFront->setTargetSpeed(leftFrontVel);
+        leftRear->setTargetSpeed(leftRearVel);
 
       }
       void cmdActuatorCallback(const std_msgs::msg::Bool::SharedPtr msg) 
@@ -100,14 +102,22 @@ class MotorDriverMiddleware : public rclcpp::Node {
         bool actuatorEnabled = msg->data;
         if (actuatorEnabled)
         {
-          lift->setMotorSpeed(1.0, false);
+          lift->setTargetSpeed(1.0);
         }
         else
         {
-          lift->setMotorSpeed(-1.0, false);
+          lift->setTargetSpeed(-1.0);
         }
         RCLCPP_INFO(this->get_logger(), "Received Actuator Command: enabled: %d", actuatorEnabled);
       }
+      void timer_callback()
+        {
+          rightFront->updateMotorSpeed(true);
+          rightRear->updateMotorSpeed(true);
+          leftFront->updateMotorSpeed(true);
+          leftRear->updateMotorSpeed(true);
+          lift->updateMotorSpeed(false);
+        }
   
       rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
       rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr cmd_actuator_sub_;
@@ -121,6 +131,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
       std::shared_ptr<MotorDriver> leftRear;
       std::shared_ptr<MotorDriver> lift;
       double vehicleWidth, wheelRadius;
+      rclcpp::TimerBase::SharedPtr timer_;
 
 };
 

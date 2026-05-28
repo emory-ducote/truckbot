@@ -18,7 +18,9 @@ class MotorDriver {
         ~MotorDriver();
         void setMeasuredSpeed(double v) { measuredSpeed.store(v); }
         double getMeasuredSpeed() const { return measuredSpeed.load(); }
-        void setMotorSpeed(const double targetSpeed, const bool usePID);
+        void setTargetSpeed(double v) { targetSpeed.store(v); }
+        double getTargetSpeed() const { return targetSpeed.load(); }
+        void updateMotorSpeed(const bool usePID);
     private:
         double speedToPWM(const double speed);
         const uint8_t chip;
@@ -26,6 +28,7 @@ class MotorDriver {
         const uint8_t pinTwo;
         int handle;
         std::atomic<double> measuredSpeed;
+        std::atomic<double> targetSpeed;
         double integralSpeed,
                prevErrorSpeed,
                Kp,
