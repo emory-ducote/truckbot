@@ -14,14 +14,21 @@ class EKFMiddleware : public rclcpp::Node {
             odom_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
               "/odom", 10, std::bind(&EKFMiddleware::odomCallback, this, std::placeholders::_1));
             publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("/local_odom", 10);
-      }
+            prevTime = std::chrono::duration<double>(
+                std::chrono::system_clock::now().time_since_epoch()
+            ).count();
+          }
 
     private:
         void odomCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
         {
           double v_t = msg->linear.x;
           double w_t = msg->angular.z;
-          state->ekf_loop(state->x, v_t, w_t);
+          double curTime = std::chrono::duration<double>(
+                std::chrono::system_clock::now().time_since_epoch()
+            ).count();
+          double dt = curTime - prevTime;
+          state->ekf_loop(state->x, v_t, w_t, dt);
           auto message = nav_msgs::msg::Odometry();
 	  message.header.frame_id = "map";
           message.pose.pose.position.x = state->x[0];
@@ -39,6 +46,7 @@ class EKFMiddleware : public rclcpp::Node {
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr odom_sub_;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_;
         std::shared_ptr<EKF> state;
+        double prevTime;
 };
 
 int main(int argc, char** argv) {
