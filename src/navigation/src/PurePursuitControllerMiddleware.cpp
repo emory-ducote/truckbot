@@ -23,7 +23,7 @@ public:
 		global_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/global_lookahead", 10);
 		local_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/local_lookahead", 10);
 		timer_ = this->create_wall_timer(
-			std::chrono::milliseconds(100),
+			std::chrono::milliseconds(10),
 			std::bind(&PurePursuitControllerMiddleware::timerCallback, this));
 	}
 
