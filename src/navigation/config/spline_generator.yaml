@@ -1,0 +1,3 @@
+spline_generator_middleware:
+  ros__parameters:
+    sample_scale: 4.0

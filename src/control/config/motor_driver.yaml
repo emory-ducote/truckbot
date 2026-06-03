@@ -1,10 +1,13 @@
-motor_controller:
+motor_driver:
   ros__parameters:
     vehicle_width: 0.2 # meters
     wheel_radius: 0.05 # meters
     max_wheel_motor_rpm: 251
     wheel_control_topic: "/cmd_vel"
     actuator_control_topic: "/cmd_actuator"
+    Kp: 2.0
+    Ki: 0.01
+    Kd: 0.001
 
     # wheel pins
     chip: 4

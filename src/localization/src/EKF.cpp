@@ -9,8 +9,8 @@ using namespace Eigen;
 using namespace LocalizationHelpers;
 using namespace std;
 
-EKF::EKF(const double frequency, Vector3d x, MatrixXd P) :
-            frequency(frequency), x(x), P(P) {
+EKF::EKF(Vector3d x, MatrixXd P) :
+            x(x), P(P) {
         spdlog::set_level(spdlog::level::info);
             }
 
@@ -21,7 +21,7 @@ MatrixXd EKF::generate_Gt(const Vector3d& u_t_1, const float& v_t, const float& 
     double prev_theta = u_t_1[2];
 
     Gt(0, 2) = ((-v_t / w_t) * cos(prev_theta)) + ((v_t / w_t) * cos(prev_theta + w_t * dt));
-    Gt(1, 2) = ((-v_t / w_t) * cos(prev_theta)) + ((v_t / w_t) * cos(prev_theta + w_t * dt));
+    Gt(1, 2) = ((-v_t / w_t) * sin(prev_theta)) + ((v_t / w_t) * sin(prev_theta + w_t * dt));
 
     spdlog::debug("Gt matrix:\n {}\n", Gt);
     return Gt;
@@ -62,7 +62,7 @@ void EKF::predict(const Vector3d& u_t_1, const float& v_t, const float& w_t, con
     Vector3d position_prediction(((-v_t / w_t) * sin(prev_theta)) + ((v_t / w_t) * sin(prev_theta + w_t * dt)), 
                                  ((v_t / w_t) * cos(prev_theta)) - ((v_t / w_t) * cos(prev_theta + w_t * dt)),
                                   w_t * dt); 
-    this->x = x + position_prediction;
+    this->x = this->x + position_prediction;
     this->x[2] = wrapAngle(this->x[2]);
     this->P = Gt * this->P * Gt.transpose() + Vt * Mt * Vt.transpose(); 
 
@@ -71,7 +71,7 @@ void EKF::predict(const Vector3d& u_t_1, const float& v_t, const float& w_t, con
 
 }
 
-void EKF::ekf_loop(Vector3d& u_t_1, const float& v_t, const float& w_t) {
+void EKF::ekf_loop(Vector3d& u_t_1, const float& v_t, const float& w_t, const double& dt) {
     if (fabs(w_t) < 1e-6)
     {
         predict(u_t_1, v_t, 0.000001, dt);
