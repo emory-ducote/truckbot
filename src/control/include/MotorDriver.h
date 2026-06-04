@@ -9,12 +9,13 @@
 
 class MotorDriver {
     public:
-        MotorDriver(const uint8_t& chip, 
+        MotorDriver(const uint8_t& chip,
                     const uint8_t& pinOne,
                     const uint8_t& pinTwo,
                     const double Kp = 1.25,
                     const double Ki = 0.0,
-                    const double Kd = 0.0);
+                    const double Kd = 0.0,
+                    const double deadband = 0.0);
         ~MotorDriver();
         void setMeasuredSpeed(double v) { measuredSpeed.store(v); }
         double getMeasuredSpeed() const { return measuredSpeed.load(); }
@@ -33,7 +34,8 @@ class MotorDriver {
                prevErrorSpeed,
                Kp,
                Ki,
-               Kd,        
+               Kd,
+               deadband,
                previousCalculationStamp;
 };
 

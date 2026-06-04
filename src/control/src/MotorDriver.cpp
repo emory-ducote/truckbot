@@ -7,18 +7,20 @@
 #include <thread>
 #include <chrono>
 
-MotorDriver::MotorDriver(const uint8_t& chip, 
+MotorDriver::MotorDriver(const uint8_t& chip,
                          const uint8_t& pinOne,
                          const uint8_t& pinTwo,
                          const double Kp,
                          const double Ki,
-                         const double Kd)
-                         : chip(chip), 
-                           pinOne(pinOne), 
-                           pinTwo(pinTwo), 
+                         const double Kd,
+                         const double deadband)
+                         : chip(chip),
+                           pinOne(pinOne),
+                           pinTwo(pinTwo),
                            Kp(Kp),
                            Ki(Ki),
                            Kd(Kd),
+                           deadband(deadband),
                            measuredSpeed(0.0),
                            prevErrorSpeed(0.0),
                            integralSpeed(0.0)
@@ -48,14 +50,24 @@ MotorDriver::~MotorDriver()
 
 void MotorDriver::updateMotorSpeed(const bool usePID)
 {
-    double speed = targetSpeed;
-    if (usePID)
-    {
-        double curTime = std::chrono::duration<double>(
+    double target = targetSpeed.load();
+
+    // When commanded to stop, cut power immediately and reset PID state.
+    double curTime = std::chrono::duration<double>(
                 std::chrono::system_clock::now().time_since_epoch()
             ).count();
         double dt = curTime - previousCalculationStamp;
-        double errorSpeed = targetSpeed - measuredSpeed.load();
+        previousCalculationStamp = curTime;
+
+    double speed = target;
+    if (usePID)
+    {
+        double errorSpeed = target - measuredSpeed.load();
+        if (std::abs(errorSpeed) < deadband)
+        {
+            prevErrorSpeed = errorSpeed;
+            return;
+        }
         integralSpeed += errorSpeed * dt;
         const double integralLimit = 1.0;
         integralSpeed = std::clamp(
