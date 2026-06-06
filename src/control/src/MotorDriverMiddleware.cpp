@@ -34,6 +34,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
           double Kp = this->declare_parameter<double>("Kp", 1.25);
           double Ki = this->declare_parameter<double>("Ki", 0.0);
           double Kd = this->declare_parameter<double>("Kd", 0.0);
+          double deadband = this->declare_parameter<double>("deadband", 0.0);
 
           RCLCPP_INFO(this->get_logger(), "KP, KI, KD: %f, %f, %f", Kp, Ki, Kd);
 
@@ -41,10 +42,10 @@ class MotorDriverMiddleware : public rclcpp::Node {
           std::string wheel_control_topic = this->declare_parameter<std::string>("wheel_control_topic", "/cmd_vel");
           std::string actuator_control_topic = this->declare_parameter<std::string>("actuator_control_topic", "/cmd_actuator");
 
-          rightFront = std::make_shared<MotorDriver>(chip, rightFrontOne, rightFrontTwo, Kp, Ki, Kd);
-          rightRear = std::make_shared<MotorDriver>(chip, rightRearOne, rightRearTwo, Kp, Ki, Kd);
-          leftFront = std::make_shared<MotorDriver>(chip, leftFrontOne, leftFrontTwo, Kp, Ki, Kd);
-          leftRear = std::make_shared<MotorDriver>(chip, leftRearOne, leftRearTwo, Kp, Ki, Kd);
+          rightFront = std::make_shared<MotorDriver>(chip, rightFrontOne, rightFrontTwo, Kp, Ki, Kd, deadband);
+          rightRear = std::make_shared<MotorDriver>(chip, rightRearOne, rightRearTwo, Kp, Ki, Kd, deadband);
+          leftFront = std::make_shared<MotorDriver>(chip, leftFrontOne, leftFrontTwo, Kp, Ki, Kd, deadband);
+          leftRear = std::make_shared<MotorDriver>(chip, leftRearOne, leftRearTwo, Kp, Ki, Kd, deadband);
           lift = std::make_shared<MotorDriver>(chip, liftOne, liftTwo);
 
           // Subscribe to per-wheel encoder topics (published by EncoderDriverMiddleware)
