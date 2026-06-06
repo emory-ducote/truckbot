@@ -3,9 +3,9 @@
 <package format="3">
   <name>control</name>
   <version>0.1.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="emory@todo.todo">emory</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Motor control and joystick teleoperation for truckbot via GPIO</description>
+  <maintainer email="emoryducote@gmail.com">Emory Ducote</maintainer>
+  <license>MIT</license>
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>

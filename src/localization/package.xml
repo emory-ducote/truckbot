@@ -3,9 +3,9 @@
 <package format="3">
   <name>localization</name>
   <version>0.1.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="emory@todo.todo">emory</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Extended Kalman Filter for IMU sensor fusion and state estimation on truckbot</description>
+  <maintainer email="emoryducote@gmail.com">Emory Ducote</maintainer>
+  <license>MIT</license>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>nav_msgs</depend>

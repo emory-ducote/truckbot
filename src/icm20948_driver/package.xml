@@ -3,9 +3,9 @@
 <package format="3">
   <name>icm20948_driver</name>
   <version>0.1.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="emory@todo.todo">emory</maintainer>
-  <license>TODO: License declaration</license>
+  <description>ROS2 driver for the ICM-20948 IMU sensor (accelerometer, gyroscope, magnetometer)</description>
+  <maintainer email="emoryducote@gmail.com">Emory Ducote</maintainer>
+  <license>MIT</license>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>Eigen3</depend>
