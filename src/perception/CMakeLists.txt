@@ -44,9 +44,16 @@ target_link_libraries(voxelization fmt::fmt)
 ament_target_dependencies(voxelization rclcpp sensor_msgs laser_geometry 
                                            visualization_msgs pcl_conversions PCL)
 
+add_executable(line_extractor
+  src/LineExtractionMiddleware.cpp
+  src/LineExtraction.cpp
+)
+ament_target_dependencies(line_extractor rclcpp sensor_msgs visualization_msgs)
+
 install(TARGETS
   feature_detector
   voxelization
+  line_extractor
   DESTINATION lib/${PROJECT_NAME})
 
 

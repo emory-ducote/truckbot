@@ -33,7 +33,7 @@ struct Particle {
             Matrix2d cov = landmark.P;
             double points[2] = {point(0), point(1)};
             tree = insert(tree, points, cov);
-            seenLandmarkCounts[{point(0), point(1)}] = 4;
+            seenLandmarkCounts[{point(0), point(1)}] = 5;
         }
 
         void updateLandmark(Landmark& oldLandmark, Landmark& newLandmark)
