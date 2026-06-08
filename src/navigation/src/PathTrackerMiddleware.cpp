@@ -1,7 +1,7 @@
 
 #include <chrono>
 #include "rclcpp/rclcpp.hpp"
-#include "nav_msgs/msg/odometry.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "std_msgs/msg/int64.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
@@ -12,8 +12,8 @@ class PathTrackerMiddleware : public rclcpp::Node {
   public:
     PathTrackerMiddleware(std::shared_ptr<PathTracker> pathTracker) : Node("path_tracker_middleware"), pathTracker(pathTracker)
     {
-      odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-                "/local_odom", 10, std::bind(&PathTrackerMiddleware::odomCallback, this, std::placeholders::_1));
+      odom_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+                "/heaviest_particle_pose", 10, std::bind(&PathTrackerMiddleware::odomCallback, this, std::placeholders::_1));
       path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
                 "/global_path", 10, std::bind(&PathTrackerMiddleware::pathCallback, this, std::placeholders::_1));
       global_path_index_pub_ = this->create_publisher<std_msgs::msg::Int64>("/global_path_index", 10);
@@ -24,13 +24,15 @@ class PathTrackerMiddleware : public rclcpp::Node {
     }
 
   private:
-    void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+    void odomCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
-      navigation::VehiclePose newPose(msg->pose.pose.position.x,
-                                      msg->pose.pose.position.y,
-                                      msg->pose.pose.orientation.z);
+      auto& q = msg->pose.orientation;
+      double yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y),
+                              1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+      navigation::VehiclePose newPose(msg->pose.position.x,
+                                      msg->pose.position.y,
+                                      yaw);
       pathTracker->setVehiclePose(newPose);
-      
     }
     void pathCallback(const nav_msgs::msg::Path::SharedPtr msg)
     {
@@ -65,7 +67,7 @@ class PathTrackerMiddleware : public rclcpp::Node {
       }
     }
 
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr odom_sub_;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
     rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr global_path_index_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_path_point_pub_;

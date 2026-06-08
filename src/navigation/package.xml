@@ -4,7 +4,7 @@
   <name>navigation</name>
   <version>0.1.0</version>
   <description>Navigation package for truckbot</description>
-  <maintainer email="emory@todo.todo">emory</maintainer>
+  <maintainer email="emoryducote@gmail.com">Emory Ducote</maintainer>
   <license>MIT</license>
   <depend>rclcpp</depend>
   <depend>nav_msgs</depend>

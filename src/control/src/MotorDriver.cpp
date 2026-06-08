@@ -43,7 +43,7 @@ MotorDriver::MotorDriver(const uint8_t& chip,
 MotorDriver::~MotorDriver()
 {
     setTargetSpeed(0.0);
-    updateMotorSpeed(true);
+    updateMotorSpeed(false);
     usleep(10000);
     lgGpiochipClose(handle);
 }

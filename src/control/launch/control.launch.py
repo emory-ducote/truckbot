@@ -10,10 +10,10 @@ def generate_launch_description():
         'config',
         'encoder_driver.yaml'
     )
-    motor_controller_config = os.path.join(
+    motor_driver_config = os.path.join(
         get_package_share_directory('control'),
         'config',
-        'motor_controller.yaml'
+        'motor_driver.yaml'
     )
     return LaunchDescription([
         Node(
@@ -24,8 +24,8 @@ def generate_launch_description():
         ),
         Node(
             package='control',
-            executable='motor_controller',
-            name='motor_controller',
-            parameters=[motor_controller_config]
+            executable='motor_driver',
+            name='motor_driver',
+            parameters=[motor_driver_config]
         )
     ])

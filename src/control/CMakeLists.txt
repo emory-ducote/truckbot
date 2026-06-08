@@ -15,6 +15,7 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 INCLUDE_DIRECTORIES(
   include
@@ -49,6 +50,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
     rclcpp
     std_msgs
     geometry_msgs
+    nav_msgs
   )
 
   install(TARGETS
