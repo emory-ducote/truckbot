@@ -6,7 +6,7 @@ Path planning and following for truckbot. The package implements a pipeline of f
 ```
 simple_path_server ──/global_path──► path_tracker ──/global_path_index──► spline_generator ──/local_path──► pure_pursuit_controller ──/cmd_vel──► control
                                 ▲                                                                         ▲
-                      localization /local_odom                                              localization /local_odom
+                localization /heaviest_particle_pose                              localization /heaviest_particle_pose
 ```
 
 ## Features
@@ -66,7 +66,7 @@ Publishes a static global path loaded from parameters at a fixed rate.
 Finds the nearest waypoint on the global path to the current vehicle pose and publishes its index.
 
 - **Subscribed topics:**
-  - `/local_odom` (`nav_msgs/msg/Odometry`): vehicle pose from localization
+  - `/heaviest_particle_pose` (`geometry_msgs/msg/PoseStamped`): map-frame vehicle pose from particle filter
   - `/global_path` (`nav_msgs/msg/Path`): global path from `simple_path_server`
 - **Published topics:**
   - `/global_path_index` (`std_msgs/msg/Int64`): index of the nearest path waypoint
@@ -87,7 +87,7 @@ Generates a smooth local path by fitting a spline to the global path ahead of th
 Implements a pure pursuit controller that tracks the local path and publishes velocity commands.
 
 - **Subscribed topics:**
-  - `/local_odom` (`nav_msgs/msg/Odometry`): vehicle pose from localization
+  - `/heaviest_particle_pose` (`geometry_msgs/msg/PoseStamped`): map-frame vehicle pose from particle filter
   - `/local_path` (`nav_msgs/msg/Path`): local path from `spline_generator`
 - **Published topics:**
   - `/cmd_vel` (`geometry_msgs/msg/Twist`): commanded linear and angular velocity

@@ -31,7 +31,7 @@ add_executable(ekf
 )
 
 target_link_libraries(ekf Eigen3::Eigen fmt::fmt)
-ament_target_dependencies(ekf rclcpp sensor_msgs std_msgs nav_msgs)
+ament_target_dependencies(ekf rclcpp sensor_msgs std_msgs nav_msgs geometry_msgs tf2_ros)
 
 add_executable(particle_filter
   src/ParticleFilterMiddleware.cpp
@@ -39,7 +39,7 @@ add_executable(particle_filter
 )
 
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
-ament_target_dependencies(particle_filter rclcpp visualization_msgs tf2_ros)
+ament_target_dependencies(particle_filter rclcpp visualization_msgs nav_msgs tf2_ros)
 
 # add_executable(particle_filter_simulator
 #   src/ParticleFilterSimulator.cpp

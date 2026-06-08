@@ -2,7 +2,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include <chrono>
 #include "std_msgs/msg/float64.hpp"
-#include "geometry_msgs/msg/twist.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 
 using namespace std::chrono_literals;
 
@@ -49,9 +49,7 @@ class EncoderDriverMiddleware : public rclcpp::Node {
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(1000 / update_rate),
             std::bind(&EncoderDriverMiddleware::timer_callback, this));
-        // Use encoder_topic for publisher topic
-        odom_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>(encoder_topic, 10);
-        // You can use frame_id later when publishing messages if needed
+        odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>(encoder_topic, 10);
       }
     private:
         void timer_callback()
@@ -65,24 +63,27 @@ class EncoderDriverMiddleware : public rclcpp::Node {
 
           auto rightWheelSpeed = (rightFrontWheelSpeed + rightRearWheelSpeed) / 2;
           auto leftWheelSpeed = (leftFrontWheelSpeed + leftRearWheelSpeed) / 2;
-          
-          auto message = geometry_msgs::msg::Twist();
 
-          message.linear.x = (rightWheelSpeed + leftWheelSpeed) / 2; // should be / 2 - hm
-          message.angular.z = (rightWheelSpeed - leftWheelSpeed) / wheelSeparation;
+          auto message = nav_msgs::msg::Odometry();
+          message.header.stamp = this->now();
+          message.header.frame_id = "odom";
+          message.child_frame_id = "base_link";
+          message.twist.twist.linear.x = (rightWheelSpeed + leftWheelSpeed) / 2;
+          message.twist.twist.angular.z = (rightWheelSpeed - leftWheelSpeed) / wheelSeparation;
+
           std_msgs::msg::Float64 m;
           m.data = leftFrontWheelSpeed; left_front_pub_->publish(m);
           m.data = leftRearWheelSpeed; left_rear_pub_->publish(m);
           m.data = rightFrontWheelSpeed; right_front_pub_->publish(m);
           m.data = rightRearWheelSpeed; right_rear_pub_->publish(m);
-	        odom_publisher_->publish(message);
+          odom_publisher_->publish(message);
         }
 
         std::shared_ptr<EncoderDriver> rightFront;
         std::shared_ptr<EncoderDriver> rightRear;
         std::shared_ptr<EncoderDriver> leftFront;
         std::shared_ptr<EncoderDriver> leftRear;
-        rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr odom_publisher_;
+        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr left_front_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr left_rear_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr right_front_pub_;
