@@ -1,8 +1,8 @@
 #include "ParticleFilter.h"
-#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include "rclcpp/rclcpp.hpp"
 #include <visualization_msgs/msg/marker_array.hpp>
-#include "geometry_msgs/msg/twist.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
@@ -14,9 +14,9 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr landmark_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr all_particles_pose_pub_;
-    std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_broadcaster_;
+    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   public:
-    ParticleFilterMiddleware() 
+    ParticleFilterMiddleware()
       : Node("particle_filter_middleware")
     {
       int numParticles = this->declare_parameter<int>("num_particles", 100);
@@ -31,7 +31,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       double linearVelocityAlpha2 = this->declare_parameter<double>("linear_velocity_alpha_2", 0.05);
       double angularVelocityAlpha1 = this->declare_parameter<double>("angular_velocity_alpha_1", 0.05);
       double angularVelocityAlpha2 = this->declare_parameter<double>("angular_velocity_alpha_2", 0.2);
-      
+
 
       particleFilter = std::make_shared<ParticleFilter>(numParticles,
                                                              newParticleIncrease,
@@ -45,34 +45,34 @@ class ParticleFilterMiddleware : public rclcpp::Node {
                                                              linearVelocityAlpha2,
                                                              angularVelocityAlpha1,
                                                              angularVelocityAlpha2);
-                                                             
-      u_t << 0.0, 0.0;    
+
+      u_t << 0.0, 0.0;
 
       cluster_sub_ = this->create_subscription<visualization_msgs::msg::MarkerArray>("/cluster_markers",
                                                                                      10,
                                                                                     std::bind(&ParticleFilterMiddleware::clusterCallback, this, std::placeholders::_1));
-      control_sub_ = this->create_subscription<geometry_msgs::msg::Twist>("/odom",
+      control_sub_ = this->create_subscription<nav_msgs::msg::Odometry>("/odom",
                                                                           10,
                                                                           std::bind(&ParticleFilterMiddleware::controlCallback, this, std::placeholders::_1));
 
       landmark_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/heaviest_particle_landmarks", 10);
       pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/heaviest_particle_pose", 10);
       all_particles_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/all_particles_poses", 10);
-      
-      static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);                                       
-    
+
+      tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+
       RCLCPP_INFO(this->get_logger(), "Initialized Filter");
 
     }
     double prev_time = 0;
-  
+
   private:
     void publishHeaviestParticleTransform(const Particle& heaviest)
     {
       geometry_msgs::msg::TransformStamped tf_msg;
       tf_msg.header.stamp = this->now();
       tf_msg.header.frame_id = "map";
-      tf_msg.child_frame_id = "laser";
+      tf_msg.child_frame_id = "odom";
       tf_msg.transform.translation.x = heaviest.x[0];
       tf_msg.transform.translation.y = heaviest.x[1];
       tf_msg.transform.translation.z = 0.0;
@@ -81,7 +81,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       tf_msg.transform.rotation.y = 0.0;
       tf_msg.transform.rotation.z = sin(theta/2.0);
       tf_msg.transform.rotation.w = cos(theta/2.0);
-      static_broadcaster_->sendTransform(tf_msg);
+      tf_broadcaster_->sendTransform(tf_msg);
     }
     void clusterCallback(const visualization_msgs::msg::MarkerArray::SharedPtr msg)
     {
@@ -108,7 +108,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
         z_t_s.push_back(z_t);
       }
       std::vector<Particle> result = particleFilter->particleFilterLoop(u_t, z_t_s, dt);
-      
+
       // Publish all particle poses
       geometry_msgs::msg::PoseArray all_poses_msg;
       all_poses_msg.header.stamp = this->now();
@@ -127,7 +127,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
         all_poses_msg.poses.push_back(pose);
       }
       all_particles_pose_pub_->publish(all_poses_msg);
-      
+
       // Find the heaviest weighted particle
       if (!result.empty()) {
         auto max_it = std::max_element(result.begin(), result.end(), [](const Particle& a, const Particle& b) {
@@ -136,8 +136,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
         if (max_it != result.end()) {
           Particle& heaviest = *max_it;
           publishHeaviestParticleTransform(heaviest);
-          // Publish the transform from map to laser as the heaviest particle pose
-          
+
           // Publish pose estimate
           geometry_msgs::msg::PoseStamped pose_msg;
           pose_msg.header.stamp = this->now();
@@ -151,13 +150,13 @@ class ParticleFilterMiddleware : public rclcpp::Node {
           pose_msg.pose.orientation.z = sin(theta/2.0);
           pose_msg.pose.orientation.w = cos(theta/2.0);
           pose_pub_->publish(pose_msg);
-          
+
           auto landmarks = heaviest.getLandmarks(); // Assumes vector<Vector2d>
           visualization_msgs::msg::MarkerArray landmark_markers;
           int landmark_id = 0;
           for (const auto& lm : landmarks) {
             visualization_msgs::msg::Marker marker;
-            marker.header.frame_id = "/map";
+            marker.header.frame_id = "map";
             marker.header.stamp = this->now();
             marker.ns = "heaviest_particle_landmarks";
             marker.id = landmark_id++;
@@ -184,14 +183,14 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       }
     }
 
-    void controlCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
+    void controlCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-      u_t(0) = msg->linear.x*1.5;
-      u_t(1) = msg->angular.z;
+      u_t(0) = msg->twist.twist.linear.x;
+      u_t(1) = msg->twist.twist.angular.z;
     }
 
     rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr cluster_sub_;
-    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr control_sub_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr control_sub_;
     std::shared_ptr<ParticleFilter> particleFilter;
     std::vector<Particle> result;
     Vector2d u_t;
