@@ -6,6 +6,7 @@ An autonomous indoor ground vehicle that delivers drinks within an apartment. Th
 
 | Package | Description |
 |---|---|
+| [`truckbot_bringup`](src/truckbot_bringup/) | Top-level launch file and static TF geometry |
 | [`control`](src/control/) | Motor control and joystick teleoperation via GPIO |
 | [`localization`](src/localization/) | Extended Kalman Filter for IMU sensor fusion and state estimation |
 | [`navigation`](src/navigation/) | Path serving, spline generation, and pure pursuit path following |
