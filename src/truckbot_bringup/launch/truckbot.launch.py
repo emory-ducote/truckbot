@@ -1,4 +1,5 @@
 import os
+import math
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -21,7 +22,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='base_link_to_laser',
-            arguments=['0.055', '0', '0.13', '0', '0', '0', 'base_link', 'laser']
+            arguments=['0.055', '0', '0.13', str(math.pi), '0', '0', 'base_link', 'laser']
         ),
 
         # --- Subsystems ---
@@ -40,16 +41,16 @@ def generate_launch_description():
                 os.path.join(navigation_dir, 'launch', 'navigation.launch.py')
             )
         ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(perception_dir, 'launch', 'voxelization.launch.py')
-            )
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(imu_dir, 'launch', 'imu.launch.py')
-            )
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         os.path.join(perception_dir, 'launch', 'voxelization.launch.py')
+        #     )
+        # ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         os.path.join(imu_dir, 'launch', 'imu.launch.py')
+        #     )
+        # ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(rplidar_dir, 'launch', 'rplidar_a1_launch.py')
