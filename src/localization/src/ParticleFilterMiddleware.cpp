@@ -76,7 +76,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       tf_msg.transform.translation.x = heaviest.x[0];
       tf_msg.transform.translation.y = heaviest.x[1];
       tf_msg.transform.translation.z = 0.0;
-      double theta = heaviest.x[2] + M_PI;
+      double theta = heaviest.x[2];
       tf_msg.transform.rotation.x = 0.0;
       tf_msg.transform.rotation.y = 0.0;
       tf_msg.transform.rotation.z = sin(theta/2.0);

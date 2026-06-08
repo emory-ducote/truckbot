@@ -33,6 +33,17 @@ struct VehiclePose {
         double dtheta = theta - other.theta;
         return VehiclePose(dx, dy, dtheta);
     }
+
+    // Transform a world-frame point into this pose's body frame
+    VehiclePose toBodyFrame(const VehiclePose& world) const {
+        double dx = world.x - x;
+        double dy = world.y - y;
+        return VehiclePose(
+             dx * std::cos(theta) + dy * std::sin(theta),
+            -dx * std::sin(theta) + dy * std::cos(theta),
+            0.0
+        );
+    }
 };
 
 } 

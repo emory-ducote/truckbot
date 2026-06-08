@@ -2,7 +2,7 @@
 #include <memory>
 #include <cmath>
 #include "rclcpp/rclcpp.hpp"
-#include "nav_msgs/msg/odometry.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
@@ -15,8 +15,8 @@ public:
 		double lookahead_distance = this->declare_parameter<double>("lookahead_distance", 1.0);
       	purePursuitController = std::make_shared<PurePursuitController>(lookahead_distance);
 
-		odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-			"/local_odom", 10, std::bind(&PurePursuitControllerMiddleware::odomCallback, this, std::placeholders::_1));
+		odom_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+			"/heaviest_particle_pose", 10, std::bind(&PurePursuitControllerMiddleware::odomCallback, this, std::placeholders::_1));
 		local_path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
 			"/local_path", 10, std::bind(&PurePursuitControllerMiddleware::localPathCallback, this, std::placeholders::_1));
 		cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
@@ -28,13 +28,16 @@ public:
 	}
 
 private:
-	void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
+	void odomCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
-      navigation::VehiclePose newPose(msg->pose.pose.position.x,
-                                      msg->pose.pose.position.y,
-                                      msg->pose.pose.orientation.z);
+      auto& q = msg->pose.orientation;
+      double yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y),
+                              1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+      navigation::VehiclePose newPose(msg->pose.position.x,
+                                      msg->pose.position.y,
+                                      yaw);
       purePursuitController->setVehiclePose(newPose);
-      
+      pose_received_ = true;
     }
 
 	void localPathCallback(const nav_msgs::msg::Path::SharedPtr msg)
@@ -48,9 +51,7 @@ private:
 
 	void timerCallback()
 	{
-		// Guard: check if pose and path are initialized
-		auto pose = purePursuitController->getVehiclePose();
-		if ((pose.x == 0 && pose.y == 0 && pose.theta == 0) || purePursuitController->getLocalPath().empty()) {
+		if (!pose_received_ || purePursuitController->getLocalPath().empty()) {
 			RCLCPP_INFO(this->get_logger(), "Waiting for pose and path initialization");
 			return;
 		}
@@ -88,7 +89,7 @@ private:
 			
 			// Publish local lookahead point for debugging
 			geometry_msgs::msg::PointStamped local_lookahead_msg;
-			local_lookahead_msg.header.stamp = this->now();
+			local_lookahead_msg.header.stamp = rclcpp::Time(0);
 			local_lookahead_msg.header.frame_id = "base_link";
 			local_lookahead_msg.point.x = localLookahead.x;
 			local_lookahead_msg.point.y = localLookahead.y;
@@ -99,13 +100,14 @@ private:
 		}
 	}
 
-	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr odom_sub_;
 	rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr local_path_sub_;
 	rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr global_lookahead_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr local_lookahead_pub_;
 	rclcpp::TimerBase::SharedPtr timer_;
 	std::shared_ptr<PurePursuitController> purePursuitController;
+	bool pose_received_ = false;
 	bool mission_done = false;
 };
 

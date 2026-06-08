@@ -4,10 +4,10 @@
 State estimation for truckbot using two complementary approaches: an Extended Kalman Filter (EKF) for dead-reckoning odometry, and a particle filter for landmark-based SLAM using LiDAR cluster detections.
 
 ## Features
-- EKF dead-reckoning from wheel encoder odometry, published as `nav_msgs/Odometry` with covariance
+- EKF dead-reckoning from wheel encoder odometry, broadcasts `odom → base_link` TF
 - FastSLAM-style particle filter: builds and maintains a landmark map from LiDAR cluster detections while estimating robot pose
 - Particle filter publishes all particle poses and the best-weight pose estimate for visualization in RViz
-- Broadcasts a `map → laser` TF transform from the highest-weight particle
+- Broadcasts a `map → odom` TF transform from the highest-weight particle
 
 ## Dependencies
 - ROS2
@@ -46,12 +46,12 @@ ros2 launch localization particle_filter.launch.py
 ## Nodes
 
 ### ekf
-Dead-reckoning odometry filter. Integrates wheel encoder velocity estimates over time to produce a `nav_msgs/Odometry` pose estimate with covariance.
+Dead-reckoning odometry filter. Integrates wheel encoder velocity estimates over time and broadcasts the `odom → base_link` TF transform.
 
 - **Subscribed topics:**
-  - `/odom` (`geometry_msgs/msg/Twist`): wheel encoder velocity from `control/encoder_driver`
-- **Published topics:**
-  - `/local_odom` (`nav_msgs/msg/Odometry`): integrated pose estimate with 3×3 EKF covariance (x, y, yaw)
+  - `/odom` (`nav_msgs/msg/Odometry`): wheel encoder velocity from `control/encoder_driver`
+- **TF broadcasts:**
+  - `odom → base_link`: filtered pose from EKF state
 - **Parameters:** None (EKF gains are set at compile time)
 
 ### particle_filter
@@ -65,7 +65,7 @@ Landmark-based SLAM using a FastSLAM-style particle filter. Each particle mainta
   - `/all_particles_poses` (`geometry_msgs/msg/PoseArray`): poses of all particles (for RViz visualization)
   - `/heaviest_particle_landmarks` (`visualization_msgs/msg/MarkerArray`): landmark map of the highest-weight particle
 - **TF broadcasts:**
-  - `map → laser`: transform derived from the highest-weight particle's pose
+  - `map → odom`: transform derived from the highest-weight particle's pose
 - **Parameters:**
   - `num_particles` (int, default: `15`): number of particles
   - `max_range` (double, default: `6.0`): maximum sensor range in meters

@@ -12,6 +12,7 @@ def generate_launch_description():
     navigation_dir = get_package_share_directory('navigation')
     perception_dir = get_package_share_directory('perception')
     imu_dir = get_package_share_directory('icm20948_driver')
+    rplidar_dir = get_package_share_directory('rplidar_ros')
 
     return LaunchDescription([
 
@@ -47,6 +48,11 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(imu_dir, 'launch', 'imu.launch.py')
+            )
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(rplidar_dir, 'launch', 'rplidar_a1_launch.py')
             )
         ),
 

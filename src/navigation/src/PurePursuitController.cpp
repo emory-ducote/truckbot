@@ -54,7 +54,7 @@ const navigation::VehiclePose& PurePursuitController::calculateLookaheadPoint()
 
 navigation::VehiclePose PurePursuitController::localLookahead(const navigation::VehiclePose& globalLookahead)
 {
-    return (globalLookahead.differenceBetween(this->getVehiclePose()));
+    return this->getVehiclePose().toBodyFrame(globalLookahead);
 }
 
 double PurePursuitController::computeControl(const navigation::VehiclePose localLookahead, const double v)
