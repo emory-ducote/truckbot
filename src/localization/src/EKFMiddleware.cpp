@@ -15,6 +15,8 @@ class EKFMiddleware : public rclcpp::Node {
       {
             odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
               "/odom", 10, std::bind(&EKFMiddleware::odomCallback, this, std::placeholders::_1));
+            imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+              "/imu", 10, std::bind(&EKFMiddleware::imuCallback, this, std::placeholders::_1));
             tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
             prevTime = std::chrono::duration<double>(
                 std::chrono::system_clock::now().time_since_epoch()
@@ -22,10 +24,15 @@ class EKFMiddleware : public rclcpp::Node {
           }
 
     private:
+        void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
+        {
+          latest_w_imu_ = msg->angular_velocity.z;
+        }
+
         void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
         {
           double v_t = msg->twist.twist.linear.x;
-          double w_t = msg->twist.twist.angular.z;
+          double w_t = latest_w_imu_;
           double curTime = std::chrono::duration<double>(
                 std::chrono::system_clock::now().time_since_epoch()
             ).count();
@@ -53,9 +60,11 @@ class EKFMiddleware : public rclcpp::Node {
         }
 
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+        rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
         std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
         std::shared_ptr<EKF> state;
         double prevTime;
+        double latest_w_imu_ = 0.0;
 };
 
 int main(int argc, char** argv) {
