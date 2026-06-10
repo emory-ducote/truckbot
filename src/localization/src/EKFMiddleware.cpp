@@ -4,7 +4,6 @@
 #include "sensor_msgs/msg/imu.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
-#include "geometry_msgs/msg/pose_stamped.hpp"
 #include <sensor_msgs/msg/joy.hpp>
 #include "std_msgs/msg/float32.hpp"
 #include <tf2_ros/transform_broadcaster.h>
