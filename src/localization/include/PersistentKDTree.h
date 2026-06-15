@@ -96,10 +96,12 @@ inline std::shared_ptr<const Node> findMinRec(std::shared_ptr<const Node> root,
                    findMinRec(root->right, d, depth + 1), d);
 }
 
-inline std::shared_ptr<const Node> findMin(std::shared_ptr<const Node> root, int d)
+inline std::shared_ptr<const Node> findMin(std::shared_ptr<const Node> root, int d, unsigned depth = 0)
 {
-    // Pass current level or depth as 0
-    return findMinRec(root, d, 0);
+    // `depth` must be the subtree root's actual depth in the tree so that the
+    // split-dimension computation (depth % k) matches. Passing the wrong depth
+    // makes findMin return a non-minimal node and corrupts the tree on delete.
+    return findMinRec(root, d, depth);
 }
 
 inline bool arePointsSame(const double point1[], const double point2[])
@@ -135,13 +137,13 @@ inline std::shared_ptr<const Node> deleteNodeRec(std::shared_ptr<const Node> roo
 
         // Node with children
         if (root->right) {
-            auto minNode = findMin(root->right, cd);
+            auto minNode = findMin(root->right, cd, depth + 1);
             double newPoint[k];
             copyPoint(newPoint, minNode->point);
             auto newRight = deleteNodeRec(root->right, minNode->point, depth + 1);
             return std::make_shared<const Node>(newPoint, minNode->P, root->left, newRight);
         } else { // only left child
-            auto minNode = findMin(root->left, cd);
+            auto minNode = findMin(root->left, cd, depth + 1);
             double newPoint[k];
             copyPoint(newPoint, minNode->point);
             auto newRight = deleteNodeRec(root->left, minNode->point, depth + 1);
