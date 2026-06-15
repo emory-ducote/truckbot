@@ -45,6 +45,8 @@ MotorDriver::~MotorDriver()
     setTargetSpeed(0.0);
     updateMotorSpeed(false);
     usleep(10000);
+    lgGpioWrite(handle, pinOne, 0);
+    lgGpioWrite(handle, pinTwo, 0);
     lgGpiochipClose(handle);
 }
 
@@ -52,63 +54,46 @@ void MotorDriver::updateMotorSpeed(const bool usePID)
 {
     double target = targetSpeed.load();
 
-    // When commanded to stop, cut power immediately and reset PID state.
     double curTime = std::chrono::duration<double>(
-                std::chrono::system_clock::now().time_since_epoch()
-            ).count();
-        double dt = curTime - previousCalculationStamp;
-        previousCalculationStamp = curTime;
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+    double dt = curTime - previousCalculationStamp;
+    previousCalculationStamp = curTime;
 
     double speed = target;
     if (usePID)
     {
-        double errorSpeed = target - measuredSpeed.load();
-        if (std::abs(errorSpeed) < deadband)
+        if (target == 0.0)
         {
-            prevErrorSpeed = errorSpeed;
-            return;
+            integralSpeed = 0.0;
+            prevErrorSpeed = 0.0;
         }
-        integralSpeed += errorSpeed * dt;
-        const double integralLimit = 1.0;
-        integralSpeed = std::clamp(
-            integralSpeed,
-            -integralLimit,
-            integralLimit
-        );
-        double derivativeSpeed = (errorSpeed - prevErrorSpeed) / dt;
-        speed = Kp * errorSpeed + 
-                       Ki * integralSpeed + 
-                       Kd * derivativeSpeed;
-        prevErrorSpeed = errorSpeed; 
+        else
+        {
+            double error = target - measuredSpeed.load();
+            if (std::abs(error) < deadband)
+            {
+                prevErrorSpeed = error;
+                return;
+            }
+            integralSpeed = std::clamp(integralSpeed + error * dt, -1.0, 1.0);
+            double derivative = (error - prevErrorSpeed) / dt;
+            speed = Kp * error + Ki * integralSpeed + Kd * derivative;
+            prevErrorSpeed = error;
+        }
     }
 
-    double PWM = speedToPWM(speed);
-    if (speed > 0) 
-    {
-        lgTxPwm(handle, pinOne, 100, 0, 0, 0);
-        lgTxPwm(handle, pinTwo, 100, PWM, 0, 0);
-
-    }
-    else if (speed < 0)
-    {
-        lgTxPwm(handle, pinOne, 100, PWM, 0, 0);
-        lgTxPwm(handle, pinTwo, 100, 0, 0, 0);
-
-    }
-    else 
-    {
-        lgTxPwm(handle, pinOne, 100, 0, 0, 0);
-        lgTxPwm(handle, pinTwo, 100, 0, 0, 0);
-    }
-    
+    double duty = speedToPWM(speed);
+    double dutyOne = 0.0;
+    double dutyTwo = 0.0;
+    if (speed < 0) { dutyOne = duty; }
+    if (speed > 0) { dutyTwo = duty; }
+    lgTxPwm(handle, pinOne, 100, dutyOne, 0, 0);
+    lgTxPwm(handle, pinTwo, 100, dutyTwo, 0, 0);
 }
 
-double MotorDriver::speedToPWM(const double speed) 
+double MotorDriver::speedToPWM(const double speed)
 {
-    // needs to be < 100%
-    double lower = -0.99; 
-    double upper = 0.99;
-    
-    return std::abs(std::max(lower, std::min(speed, upper)) * 100.0);
+    return std::abs(std::clamp(speed, -0.99, 0.99) * 100.0);
 }
 

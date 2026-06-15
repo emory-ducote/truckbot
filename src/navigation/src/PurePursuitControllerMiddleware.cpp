@@ -13,6 +13,9 @@ public:
 	PurePursuitControllerMiddleware() : Node("pure_pursuit_controller_middleware")
 	{
 		double lookahead_distance = this->declare_parameter<double>("lookahead_distance", 1.0);
+		linear_velocity_ = this->declare_parameter<double>("linear_velocity", 0.15);
+		goal_tolerance_ = this->declare_parameter<double>("goal_tolerance", 0.1);
+		int timer_period_ms = this->declare_parameter<int>("timer_period_ms", 10);
       	purePursuitController = std::make_shared<PurePursuitController>(lookahead_distance);
 
 		odom_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -23,7 +26,7 @@ public:
 		global_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/global_lookahead", 10);
 		local_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/local_lookahead", 10);
 		timer_ = this->create_wall_timer(
-			std::chrono::milliseconds(10),
+			std::chrono::milliseconds(timer_period_ms),
 			std::bind(&PurePursuitControllerMiddleware::timerCallback, this));
 	}
 
@@ -60,12 +63,12 @@ private:
 		try {
 			auto globalLookahead = purePursuitController->calculateLookaheadPoint();
 			auto localLookahead = purePursuitController->localLookahead(globalLookahead);
-			auto omega = purePursuitController->computeControl(localLookahead, 0.15);
+			auto omega = purePursuitController->computeControl(localLookahead, linear_velocity_);
 			RCLCPP_INFO(this->get_logger(), "PurePursuit omega chosen: %f", omega);
 			geometry_msgs::msg::Twist cmd_msg;
 			double distance = purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead);
 			RCLCPP_INFO(this->get_logger(), "Dist from point: %f", distance);
-			if ((purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead) < 0.1) || (mission_done))
+			if ((distance < goal_tolerance_) || (mission_done))
 			{
 				cmd_msg.linear.x = 0.0;
 				cmd_msg.angular.z = 0.0;
@@ -73,7 +76,7 @@ private:
 			}
 			else
 			{
-				cmd_msg.linear.x = 0.15;
+				cmd_msg.linear.x = linear_velocity_;
 				cmd_msg.angular.z = omega;
 			}
 			cmd_vel_pub_->publish(cmd_msg);
@@ -107,6 +110,8 @@ private:
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr local_lookahead_pub_;
 	rclcpp::TimerBase::SharedPtr timer_;
 	std::shared_ptr<PurePursuitController> purePursuitController;
+	double linear_velocity_;
+	double goal_tolerance_;
 	bool pose_received_ = false;
 	bool mission_done = false;
 };
