@@ -25,11 +25,13 @@ class ParticleFilter {
                        const double linearVelocityAlpha1 = 0.2,
                        const double linearVelocityAlpha2 = 0.05,
                        const double angularVelocityAlpha1 = 0.05,
-                       const double angularVelocityAlpha2 = 0.2);
+                       const double angularVelocityAlpha2 = 0.2,
+                       const double p0 = 1e-2);
         ~ParticleFilter();
 
         struct LikelihoodResult {
             double weight;
+            bool matched;          // associated to an existing landmark within the chi-squared gate
             Eigen::Vector2d z_hat;
             Eigen::Matrix2d H;
             Eigen::Matrix2d Q;
@@ -45,7 +47,13 @@ class ParticleFilter {
         void particleWeightUpdate(const Vector2d& z_t);
         void particlePurgeLandmarks();
         std::vector<Particle> particleWeightResampling();
-        std::vector<Particle> particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt); 
+        std::vector<Particle> particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt);
+        // Best (max-weight) particle from the most recent cycle, captured before
+        // resampling resets the weights to uniform. Its pose stays consistent
+        // with its own landmark map.
+        const Particle& getBestParticle() const { return bestParticle; }
+        // Read-only access to the particle set (used by the simulator/tests).
+        const std::vector<Particle>& getParticles() const { return particles; }
     private:
         const int numParticles;
         std::vector<Particle> particles;
@@ -60,8 +68,10 @@ class ParticleFilter {
         const double linearVelocityAlpha2;
         const double angularVelocityAlpha1;
         const double angularVelocityAlpha2;
-        Matrix2d Q_t; 
+        const double p0;
+        Matrix2d Q_t;
         Vector3d initialSigmas;
+        Particle bestParticle;
 };
 
 #endif

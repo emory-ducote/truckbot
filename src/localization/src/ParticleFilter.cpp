@@ -19,7 +19,8 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                const double linearVelocityAlpha1,
                                const double linearVelocityAlpha2,
                                const double angularVelocityAlpha1,
-                               const double angularVelocityAlpha2) : 
+                               const double angularVelocityAlpha2,
+                               const double p0) :
                                numParticles(numParticles),
                                particles(numParticles),
                                newParticleIncrease(newParticleIncrease),
@@ -32,23 +33,25 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                linearVelocityAlpha1(linearVelocityAlpha1),
                                linearVelocityAlpha2(linearVelocityAlpha2),
                                angularVelocityAlpha1(angularVelocityAlpha1),
-                               angularVelocityAlpha2(angularVelocityAlpha2) {
+                               angularVelocityAlpha2(angularVelocityAlpha2),
+                               p0(p0) {
     spdlog::set_level(spdlog::level::info);
     initialSigmas << 0.0, 0.0, 0.0;
 
     Q_t << measurementNoiseRange, 0, 
            0, measurementNoiseBearing;
+    // Single shared RNG (constructing random_device/mt19937 per particle was
+    // wasteful). With initialSigmas == 0 every particle starts at the origin;
+    // raise the sigmas to seed initial pose diversity.
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<> dist_x(0.0, initialSigmas[0]);
+    std::normal_distribution<> dist_y(0.0, initialSigmas[1]);
+    std::normal_distribution<> dist_theta(0.0, initialSigmas[2]);
+
     for (int m = 0; m < numParticles; m++)
     {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        std::normal_distribution<> dist_x(0.0, initialSigmas[0]);
-        std::normal_distribution<> dist_y(0.0, initialSigmas[1]);
-        std::normal_distribution<> dist_theta(0.0, initialSigmas[2]);
-
         Vector3d noisy_state(dist_x(gen), dist_y(gen), dist_theta(gen));
-
         particles[m] = Particle(noisy_state);
     }
 
@@ -98,7 +101,8 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
     const Node * nearest = particle.searchLandmark(points);
     if (nearest == nullptr) {
         spdlog::debug("Measurement {} No nearest!", z_t);
-        result.weight = 1e-9; 
+        result.weight = 1e-9;
+        result.matched = false;
         result.z_hat.setZero();
         result.H.setZero();
         result.Q.setIdentity();
@@ -107,9 +111,11 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
         return result;
     }
     
-    double deltaX = nearest->point[0] - particle.x[0] + 1e-9;
-    double deltaY = nearest->point[1] - particle.x[1] + 1e-9;
-    double q = pow(deltaX, 2) + pow(deltaY, 2);
+    double deltaX = nearest->point[0] - particle.x[0];
+    double deltaY = nearest->point[1] - particle.x[1];
+    double q = deltaX * deltaX + deltaY * deltaY;
+    // Guard against a landmark coinciding with the robot (division by r/q below).
+    if (q < 1e-12) q = 1e-12;
     double r = std::sqrt(q);
     double theta = wrapAngle(atan2(deltaY, deltaX) - particle.x[2]);
     
@@ -130,16 +136,19 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
     Q_j = H_j * nearest->P * H_j.transpose() + Q_t;
     Q_j += 1e-9 * Matrix2d::Identity();
 
-    // chi-squared gate: 2-DOF at 99% confidence = 9.21
+    // chi-squared gate: 2-DOF at 99% confidence = 9.21. The gate (not the raw
+    // likelihood density) decides association: inside the gate the measurement
+    // updates the nearest landmark; outside it is treated as a new feature.
     double mahalanobis_sq = innovation.transpose() * Q_j.inverse() * innovation;
-    if (mahalanobis_sq > 9.21) {
+    result.matched = (mahalanobis_sq <= 9.21);
+    if (!result.matched) {
         w_j = 1e-9;
     } else {
         double exponent = -0.5 * mahalanobis_sq;
         double normalizer = std::pow(2 * M_PI, z_t.size() / 2.0) * std::sqrt(Q_j.determinant());
         w_j = std::exp(exponent) / normalizer;
     }
-    
+
     result.weight = w_j;
     result.z_hat = z_hat_j;
     result.H = H_j;
@@ -155,14 +164,17 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
 void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t) 
 {
 
-    auto [w, z_hat, H, Q, prevX, prevP] = this->updateLikelihoodCorrespondence(particle, z_t);
+    auto [w, matched, z_hat, H, Q, prevX, prevP] = this->updateLikelihoodCorrespondence(particle, z_t);
 
-    bool newFeature = (newParticleThreshold > w);
+    bool newFeature = !matched;
     // spdlog::debug("New Feature {}", newFeature);
 
-    if (newFeature) 
+    if (newFeature)
     {
-        particle.weight = particle.weight;
+        // New / unassociated feature: weight by a fixed default importance
+        // weight p0 so new features contribute on the same scale as matched
+        // ones (rather than the inconsistent x1.0 it used to apply).
+        particle.weight = p0 * particle.weight;
         double global_angle = wrapAngle(particle.x[2] + z_t[1]);
         double mapX = particle.x[0] + z_t[0] * cos(global_angle);
         double mapY = particle.x[1] + z_t[0] * sin(global_angle);
@@ -178,11 +190,14 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
     {
         particle.weight = w*particle.weight;
         Landmark oldLandmark(prevX, prevP);
-        MatrixXd K = oldLandmark.P * H.transpose() * Q.inverse();
+        Matrix2d K = oldLandmark.P * H.transpose() * Q.inverse();
         Vector2d innovation = z_t - z_hat;
         innovation(1) = wrapAngle(innovation(1));
         Vector2d mu_j_t = oldLandmark.x + K * innovation;
-        MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * H) * oldLandmark.P;
+        // Joseph form: keeps the covariance symmetric and positive-definite over
+        // many updates (Q_t is the measurement noise R). More stable than (I-KH)P.
+        Matrix2d IKH = Matrix2d::Identity() - K * H;
+        Matrix2d sigma_j_t = IKH * oldLandmark.P * IKH.transpose() + K * Q_t * K.transpose();
         Landmark newLandmark(mu_j_t, sigma_j_t);
         particle.updateLandmark(oldLandmark, newLandmark);
         particle.seenLandmarksThisCycle.insert({mu_j_t(0), mu_j_t(1)});
@@ -211,7 +226,10 @@ std::vector<int> ParticleFilter::systematicResample(const std::vector<double>& w
     int i = 0;
     for (int m = 0; m < M; m++) {
         double u = u0 + (double)m / M;
-        while (u > cdf[i]) {
+        // Bound to M-1: cdf[M-1] is the (normalized) weight sum, which can be
+        // slightly below u due to floating-point accumulation, so an unbounded
+        // walk could index past the end.
+        while (i < M - 1 && u > cdf[i]) {
             i++;
         }
         indexes[m] = i;
@@ -258,11 +276,32 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
         weightSum += particles[p].weight;
     }
 
+    // Guard against total weight collapse (all measurements gated out, or
+    // underflow from multiplying many small likelihoods). Normalizing by a
+    // zero / non-finite sum would yield inf/NaN weights and a garbage resample,
+    // so fall back to a uniform distribution and skip resampling this cycle.
+    if (!std::isfinite(weightSum) || weightSum <= 0.0) {
+        spdlog::warn("Degenerate weight sum ({}); skipping resample, resetting to uniform.", weightSum);
+        bestParticle = particles[0];  // all weights equal; any particle is representative
+        for (auto& particle : particles) {
+            particle.weight = 1.0 / numParticles;
+        }
+        return particles;
+    }
+
     // collect and normalize weights
     std::vector<double> normalizedWeights(numParticles);
     for (int p = 0; p < numParticles; p++) {
         normalizedWeights[p] = particles[p].weight / weightSum;
     }
+
+    // Capture the best (max-weight) particle BEFORE any resample resets weights
+    // to uniform, so the published estimate keeps a coherent pose+map.
+    int bestIdx = 0;
+    for (int p = 1; p < numParticles; p++) {
+        if (normalizedWeights[p] > normalizedWeights[bestIdx]) bestIdx = p;
+    }
+    bestParticle = particles[bestIdx];
 
     // Compute Neff (effective number of particles)
     double neff = 0.0;
@@ -276,7 +315,7 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
         neff = 0.0;
     }
 
-    spdlog::info("NEFF: {}", neff);
+    spdlog::debug("NEFF: {}", neff);
 
     spdlog::debug("Started Resampling");
 
@@ -294,12 +333,19 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
             spdlog::debug("ABOUT TO RESAMPLE {}", m);
             spdlog::debug("PICKED: {}", particles[resampledIndices[m]].x);
             resampledParticles[m] = particles[resampledIndices[m]];
+            // After resampling the population represents the posterior uniformly,
+            // so reset weights to 1/N.
+            resampledParticles[m].weight = 1.0 / numParticles;
             spdlog::debug("RESAMPLED {}", m);
         }
 
     } else {
-        // No resampling, just return current particles
+        // No resampling: keep particles but store the normalized accumulated
+        // weights back so they stay bounded and continue accumulating next cycle.
         resampledParticles = particles;
+        for (int p = 0; p < numParticles; p++) {
+            resampledParticles[p].weight = normalizedWeights[p];
+        }
     }
 
     particles = resampledParticles;
@@ -314,7 +360,10 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
 std::vector<Particle> ParticleFilter::particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt)
 {
     spdlog::debug("Loop Start");
-    for (auto& p : particles) p.weight = 1.0;
+    // Weights are NOT reset here: they accumulate across cycles and are reset to
+    // uniform only immediately after a resample (see particleWeightResampling).
+    // Resetting every cycle would discard the measurement evidence from any
+    // cycle that did not trigger a resample.
     particleMotionUpdate(u_t, dt);
     spdlog::debug("Motion Updated");
     for (const auto& z_t: z_t_s)

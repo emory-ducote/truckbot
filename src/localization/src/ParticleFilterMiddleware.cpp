@@ -31,6 +31,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       double linearVelocityAlpha2 = this->declare_parameter<double>("linear_velocity_alpha_2", 0.05);
       double angularVelocityAlpha1 = this->declare_parameter<double>("angular_velocity_alpha_1", 0.05);
       double angularVelocityAlpha2 = this->declare_parameter<double>("angular_velocity_alpha_2", 0.2);
+      double p0 = this->declare_parameter<double>("new_feature_weight", 1e-2);
 
 
       particleFilter = std::make_shared<ParticleFilter>(numParticles,
@@ -44,7 +45,8 @@ class ParticleFilterMiddleware : public rclcpp::Node {
                                                              linearVelocityAlpha1,
                                                              linearVelocityAlpha2,
                                                              angularVelocityAlpha1,
-                                                             angularVelocityAlpha2);
+                                                             angularVelocityAlpha2,
+                                                             p0);
 
       u_t << 0.0, 0.0;
 
@@ -103,7 +105,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       {
         double q = pow(marker.pose.position.x, 2) + pow(marker.pose.position.y, 2);
         double r = std::sqrt(q);
-        double theta1 = wrapAngle(atan2(marker.pose.position.y, marker.pose.position.x) + M_PI);
+        double theta1 = wrapAngle(atan2(marker.pose.position.y, marker.pose.position.x));
         Vector2d z_t(r, theta1);
         z_t_s.push_back(z_t);
       }
@@ -128,13 +130,11 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       }
       all_particles_pose_pub_->publish(all_poses_msg);
 
-      // Find the heaviest weighted particle
+      // Use the best particle captured before resampling reset the weights to
+      // uniform, so the published pose stays consistent with its landmark map.
       if (!result.empty()) {
-        auto max_it = std::max_element(result.begin(), result.end(), [](const Particle& a, const Particle& b) {
-          return a.weight < b.weight;
-        });
-        if (max_it != result.end()) {
-          Particle& heaviest = *max_it;
+        {
+          Particle heaviest = particleFilter->getBestParticle();
           publishHeaviestParticleTransform(heaviest);
 
           // Publish pose estimate
@@ -185,6 +185,9 @@ class ParticleFilterMiddleware : public rclcpp::Node {
 
     void controlCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
+      // u_t is shared with clusterCallback without a lock. This is safe only
+      // under the default single-threaded executor; a multithreaded executor
+      // (or callback groups) would require a mutex around u_t.
       u_t(0) = msg->twist.twist.linear.x;
       u_t(1) = msg->twist.twist.angular.z;
     }

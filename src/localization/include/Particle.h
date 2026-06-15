@@ -14,8 +14,8 @@ struct Particle {
                  x(x),
                  P(P) {};
 
-        const std::vector<Vector2d> getLandmarks()
-        { 
+        std::vector<Vector2d> getLandmarks() const
+        {
             std::vector<Vector2d> landmarks;
             collectKDTreeLandmarks(tree, landmarks);
             return landmarks;
@@ -42,7 +42,7 @@ struct Particle {
             int oldCount = seenLandmarkCounts.count(oldKey) ? seenLandmarkCounts[oldKey] : 0;
             removeLandmark(oldLandmark.x);
             addLandmark(newLandmark);
-            seenLandmarkCounts[{newLandmark.x(0), newLandmark.x(1)}] = std::max(oldCount + 1, 20);
+            seenLandmarkCounts[{newLandmark.x(0), newLandmark.x(1)}] = std::min(oldCount + 1, 20);
         }
 
         const Node * searchLandmark(double points[2])
