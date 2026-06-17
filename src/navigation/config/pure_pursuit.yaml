@@ -1,3 +1,6 @@
 pure_pursuit_controller_middleware:
   ros__parameters:
     lookahead_distance: 0.5
+    linear_velocity: 0.15
+    goal_tolerance: 0.1
+    timer_period_ms: 10
