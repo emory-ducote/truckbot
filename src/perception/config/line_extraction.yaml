@@ -7,7 +7,7 @@ line_extraction_middleware:
     # Maximum number of corner features to return
     max_corners: 100
     # Minimal accepted quality of corners (fraction of the best corner's measure, 0..1)
-    quality_level: 0.01
+    quality_level: 0.15
     # Minimum spacing (m) between returned corners
     min_distance: 0.3
     # Neighbourhood size (px) for the corner covariation matrix
