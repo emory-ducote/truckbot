@@ -36,11 +36,11 @@ def generate_launch_description():
                 os.path.join(localization_dir, 'launch', 'localization.launch.py')
             )
         ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(navigation_dir, 'launch', 'navigation.launch.py')
-            )
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         os.path.join(navigation_dir, 'launch', 'navigation.launch.py')
+        #     )
+        # ),
         # IncludeLaunchDescription(
         #     PythonLaunchDescriptionSource(
         #         os.path.join(perception_dir, 'launch', 'voxelization.launch.py')

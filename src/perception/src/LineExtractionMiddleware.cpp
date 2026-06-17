@@ -11,13 +11,13 @@ public:
         double mapResolution     = declare_parameter<double>("map_resolution",       0.03);
         double mapRange          = declare_parameter<double>("map_range",            6.0);
         int    maxCorners        = declare_parameter<int>   ("max_corners",          100);
-        double qualityLevel      = declare_parameter<double>("quality_level",        0.01);
-        double minDistance       = declare_parameter<double>("min_distance",         0.3);
+        double qualityLevel      = declare_parameter<double>("quality_level",        0.7);
+        double minDistance       = declare_parameter<double>("min_distance",         0.5);
         int    blockSize         = declare_parameter<int>   ("block_size",           3);
         bool   useHarrisDetector = declare_parameter<bool>  ("use_harris_detector",  false);
         double harrisK           = declare_parameter<double>("harris_k",             0.04);
-        int    wallThickness     = declare_parameter<int>   ("wall_thickness",       1);
-        double minCornerDistance = declare_parameter<double>("min_corner_distance",  0.5);
+        int    wallThickness     = declare_parameter<int>   ("wall_thickness",       2);
+        double minCornerDistance = declare_parameter<double>("min_corner_distance",  0.15);
 
         extractor_ = std::make_shared<LineExtraction>(mapResolution,
                                                       mapRange,

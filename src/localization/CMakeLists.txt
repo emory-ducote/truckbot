@@ -20,6 +20,9 @@ find_package(Eigen3 3.3 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(TBB REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 include_directories(
   include
@@ -39,7 +42,7 @@ add_executable(particle_filter
 )
 
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
-ament_target_dependencies(particle_filter rclcpp visualization_msgs nav_msgs tf2_ros)
+ament_target_dependencies(particle_filter rclcpp visualization_msgs nav_msgs geometry_msgs tf2_ros tf2 tf2_geometry_msgs)
 
 add_executable(particle_filter_simulator
   src/ParticleFilterSimulator.cpp

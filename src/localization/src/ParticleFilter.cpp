@@ -252,8 +252,13 @@ void ParticleFilter::particleWeightUpdate(const Vector2d& z_t)
 
 void ParticleFilter::particlePurgeLandmarks()
 {
+    // Only purge within the near, reliably-sensed band. Beyond 0.5 * maxRange a
+    // missed detection is more likely a detector dropout or occlusion than a real
+    // deletion, so those landmarks are spared; they become purge-eligible again
+    // once the robot drives close enough to confidently re-observe them.
+    const double purgeRange = 0.5 * maxRange;
     for (auto& particle : particles) {
-            std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(maxRange, maxAngle);
+            std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(purgeRange, maxAngle);
             for (const auto& lm : landmarksInRange) {
                 auto key = std::make_pair(lm(0), lm(1));
                 if (particle.seenLandmarksThisCycle.count(key)) continue;
