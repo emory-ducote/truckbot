@@ -8,20 +8,26 @@ class LineExtractionMiddleware : public rclcpp::Node
 public:
     LineExtractionMiddleware() : Node("line_extraction_middleware")
     {
-        double splitThreshold    = declare_parameter<double>("split_threshold",      0.05);
-        int    minPointsPerLine  = declare_parameter<int>   ("min_points_per_line",  6);
-        double minLineLength     = declare_parameter<double>("min_line_length",      0.3);
-        double maxExtrapolation  = declare_parameter<double>("max_extrapolation",    0.8);
-        double minCornerAngleDeg = declare_parameter<double>("min_corner_angle",     30.0);
-        double gapThreshold      = declare_parameter<double>("gap_threshold",        0.5);
+        double mapResolution     = declare_parameter<double>("map_resolution",       0.03);
+        double mapRange          = declare_parameter<double>("map_range",            6.0);
+        int    maxCorners        = declare_parameter<int>   ("max_corners",          100);
+        double qualityLevel      = declare_parameter<double>("quality_level",        0.01);
+        double minDistance       = declare_parameter<double>("min_distance",         0.3);
+        int    blockSize         = declare_parameter<int>   ("block_size",           3);
+        bool   useHarrisDetector = declare_parameter<bool>  ("use_harris_detector",  false);
+        double harrisK           = declare_parameter<double>("harris_k",             0.04);
+        int    wallThickness     = declare_parameter<int>   ("wall_thickness",       1);
         double minCornerDistance = declare_parameter<double>("min_corner_distance",  0.5);
 
-        extractor_ = std::make_shared<LineExtraction>(splitThreshold,
-                                                      minPointsPerLine,
-                                                      minLineLength,
-                                                      maxExtrapolation,
-                                                      minCornerAngleDeg,
-                                                      gapThreshold,
+        extractor_ = std::make_shared<LineExtraction>(mapResolution,
+                                                      mapRange,
+                                                      maxCorners,
+                                                      qualityLevel,
+                                                      minDistance,
+                                                      blockSize,
+                                                      useHarrisDetector,
+                                                      harrisK,
+                                                      wallThickness,
                                                       minCornerDistance);
 
         scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>(

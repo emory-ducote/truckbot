@@ -20,6 +20,7 @@ find_package(fmt REQUIRED)
 find_package(laser_geometry REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
+find_package(OpenCV REQUIRED)
 
 
 INCLUDE_DIRECTORIES(
@@ -48,7 +49,8 @@ add_executable(line_extractor
   src/LineExtractionMiddleware.cpp
   src/LineExtraction.cpp
 )
-ament_target_dependencies(line_extractor rclcpp sensor_msgs visualization_msgs)
+target_link_libraries(line_extractor ${OpenCV_LIBS})
+ament_target_dependencies(line_extractor rclcpp sensor_msgs visualization_msgs OpenCV)
 
 install(TARGETS
   feature_detector
