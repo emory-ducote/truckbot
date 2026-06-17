@@ -45,17 +45,17 @@ target_link_libraries(voxelization fmt::fmt)
 ament_target_dependencies(voxelization rclcpp sensor_msgs laser_geometry 
                                            visualization_msgs pcl_conversions PCL)
 
-add_executable(line_extractor
-  src/LineExtractionMiddleware.cpp
-  src/LineExtraction.cpp
+add_executable(corner_detector
+  src/CornerDetectorMiddleware.cpp
+  src/CornerDetector.cpp
 )
-target_link_libraries(line_extractor ${OpenCV_LIBS})
-ament_target_dependencies(line_extractor rclcpp sensor_msgs visualization_msgs OpenCV)
+target_link_libraries(corner_detector ${OpenCV_LIBS})
+ament_target_dependencies(corner_detector rclcpp sensor_msgs visualization_msgs OpenCV)
 
 install(TARGETS
   feature_detector
   voxelization
-  line_extractor
+  corner_detector
   DESTINATION lib/${PROJECT_NAME})
 
 

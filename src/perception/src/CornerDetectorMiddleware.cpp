@@ -1,25 +1,25 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include <visualization_msgs/msg/marker_array.hpp>
-#include "LineExtraction.h"
+#include "CornerDetector.h"
 
-class LineExtractionMiddleware : public rclcpp::Node
+class CornerDetectorMiddleware : public rclcpp::Node
 {
 public:
-    LineExtractionMiddleware() : Node("line_extraction_middleware")
+    CornerDetectorMiddleware() : Node("corner_detector_middleware")
     {
-        double mapResolution     = declare_parameter<double>("map_resolution",       0.03);
-        double mapRange          = declare_parameter<double>("map_range",            6.0);
-        int    maxCorners        = declare_parameter<int>   ("max_corners",          100);
-        double qualityLevel      = declare_parameter<double>("quality_level",        0.7);
-        double minDistance       = declare_parameter<double>("min_distance",         0.5);
-        int    blockSize         = declare_parameter<int>   ("block_size",           3);
-        bool   useHarrisDetector = declare_parameter<bool>  ("use_harris_detector",  false);
-        double harrisK           = declare_parameter<double>("harris_k",             0.04);
-        int    wallThickness     = declare_parameter<int>   ("wall_thickness",       2);
-        double minCornerDistance = declare_parameter<double>("min_corner_distance",  0.15);
+        double mapResolution     = declare_parameter<double>("map_resolution",      0.05);
+        double mapRange          = declare_parameter<double>("map_range",           6.0);
+        int    maxCorners        = declare_parameter<int>   ("max_corners",         100);
+        double qualityLevel      = declare_parameter<double>("quality_level",       0.15);
+        double minDistance       = declare_parameter<double>("min_distance",        0.3);
+        int    blockSize         = declare_parameter<int>   ("block_size",          3);
+        bool   useHarrisDetector = declare_parameter<bool>  ("use_harris_detector", false);
+        double harrisK           = declare_parameter<double>("harris_k",            0.04);
+        int    wallThickness     = declare_parameter<int>   ("wall_thickness",      2);
+        double minCornerDistance = declare_parameter<double>("min_corner_distance", 0.5);
 
-        extractor_ = std::make_shared<LineExtraction>(mapResolution,
+        extractor_ = std::make_shared<CornerDetector>(mapResolution,
                                                       mapRange,
                                                       maxCorners,
                                                       qualityLevel,
@@ -32,11 +32,11 @@ public:
 
         scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>(
             "/scan", 10,
-            std::bind(&LineExtractionMiddleware::scanCallback, this, std::placeholders::_1));
+            std::bind(&CornerDetectorMiddleware::scanCallback, this, std::placeholders::_1));
 
         corner_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>("/cluster_markers", 10);
 
-        RCLCPP_INFO(get_logger(), "Line extraction node ready");
+        RCLCPP_INFO(get_logger(), "Corner detector node ready");
     }
 
 private:
@@ -66,6 +66,7 @@ private:
             m.color.g = 0.5;
             m.color.b = 0.0;
             m.color.a = 1.0;
+            m.lifetime = rclcpp::Duration::from_seconds(0.15);
             marker_array.markers.push_back(m);
         }
 
@@ -75,13 +76,13 @@ private:
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr corner_pub_;
-    std::shared_ptr<LineExtraction> extractor_;
+    std::shared_ptr<CornerDetector> extractor_;
 };
 
 int main(int argc, char* argv[])
 {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<LineExtractionMiddleware>());
+    rclcpp::spin(std::make_shared<CornerDetectorMiddleware>());
     rclcpp::shutdown();
     return 0;
 }

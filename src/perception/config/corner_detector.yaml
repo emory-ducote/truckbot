@@ -1,4 +1,4 @@
-line_extraction_middleware:
+corner_detector_middleware:
   ros__parameters:
     # Metres per pixel of the rasterized occupancy image fed to goodFeaturesToTrack
     map_resolution: 0.05

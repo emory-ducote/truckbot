@@ -25,11 +25,11 @@ class JoyListener : public rclcpp::Node {
         cmd_vel_publisher_->publish(twist_message);
         int y_button = msg->buttons[0];
         int a_button = msg->buttons[1];
-        bool up = false;
+        bool up = true;
         up = (y_button > 0) ? true : (a_button > 0) ? false : up;
         auto bool_message = std_msgs::msg::Bool();
         bool_message.data = up;
-        // cmd_actuator_publisher_->publish(bool_message);
+        cmd_actuator_publisher_->publish(bool_message);
         RCLCPP_INFO(this->get_logger(), "Received data: left stick: %f, right stick %f, Y button: %d, A button %d",
                     left_stick_x, right_stick_x, y_button, a_button);
       }

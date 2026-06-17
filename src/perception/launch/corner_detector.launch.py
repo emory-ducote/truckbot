@@ -5,17 +5,17 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    line_extraction_config = os.path.join(
+    corner_detector_config = os.path.join(
         get_package_share_directory('perception'),
         'config',
-        'line_extraction.yaml'
+        'corner_detector.yaml'
     )
     return LaunchDescription([
         Node(
             package='perception',
-            executable='line_extractor',
-            name='line_extraction_middleware',
+            executable='corner_detector',
+            name='corner_detector_middleware',
             output='screen',
-            parameters=[line_extraction_config]
+            parameters=[corner_detector_config]
         )
     ])

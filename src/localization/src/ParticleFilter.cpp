@@ -262,10 +262,11 @@ void ParticleFilter::particlePurgeLandmarks()
             for (const auto& lm : landmarksInRange) {
                 auto key = std::make_pair(lm(0), lm(1));
                 if (particle.seenLandmarksThisCycle.count(key)) continue;
-                if (particle.seenLandmarkCounts[key] <= 0) {
+                auto it = particle.seenLandmarkCounts.find(key);
+                if (it == particle.seenLandmarkCounts.end() || it->second <= 0) {
                     particle.removeLandmark(lm);
                 } else {
-                    particle.seenLandmarkCounts[key] -= 1;
+                    it->second -= 1;
                 }
             }
             particle.seenLandmarksThisCycle.clear();

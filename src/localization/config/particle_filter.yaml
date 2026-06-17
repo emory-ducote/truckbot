@@ -12,3 +12,4 @@ particle_filter:
     linear_velocity_alpha_2: 0.05
     angular_velocity_alpha_2: 0.15
     angular_velocity_alpha_1: 0.15
+    new_feature_weight: 0.01

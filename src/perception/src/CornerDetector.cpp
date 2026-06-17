@@ -1,8 +1,10 @@
-#include "LineExtraction.h"
+#include "CornerDetector.h"
 #include <cmath>
 #include <opencv2/imgproc.hpp>
 
-LineExtraction::LineExtraction(double mapResolution,
+using Eigen::Vector2d;
+
+CornerDetector::CornerDetector(double mapResolution,
                                double mapRange,
                                int    maxCorners,
                                double qualityLevel,
@@ -24,12 +26,12 @@ LineExtraction::LineExtraction(double mapResolution,
     , minCornerDistance(minCornerDistance)
 {}
 
-int LineExtraction::imageSize() const
+int CornerDetector::imageSize() const
 {
     return std::max(1, static_cast<int>(std::round(2.0 * mapRange / mapResolution)));
 }
 
-cv::Mat LineExtraction::rasterizeScan(const sensor_msgs::msg::LaserScan& scan) const
+cv::Mat CornerDetector::rasterizeScan(const sensor_msgs::msg::LaserScan& scan) const
 {
     const int    size   = imageSize();
     const double center = size / 2.0;
@@ -59,7 +61,7 @@ cv::Mat LineExtraction::rasterizeScan(const sensor_msgs::msg::LaserScan& scan) c
     return occupancy;
 }
 
-std::vector<cv::Point2f> LineExtraction::detectFeatures(const cv::Mat& occupancy) const
+std::vector<cv::Point2f> CornerDetector::detectFeatures(const cv::Mat& occupancy) const
 {
     std::vector<cv::Point2f> features;
     cv::goodFeaturesToTrack(occupancy,
@@ -74,7 +76,7 @@ std::vector<cv::Point2f> LineExtraction::detectFeatures(const cv::Mat& occupancy
     return features;
 }
 
-std::vector<Vector2d> LineExtraction::toLaserFrame(const std::vector<cv::Point2f>& features) const
+std::vector<Vector2d> CornerDetector::toLaserFrame(const std::vector<cv::Point2f>& features) const
 {
     const double center = imageSize() / 2.0;
 
@@ -89,7 +91,7 @@ std::vector<Vector2d> LineExtraction::toLaserFrame(const std::vector<cv::Point2f
     return corners;
 }
 
-std::vector<Vector2d> LineExtraction::extractCorners(const sensor_msgs::msg::LaserScan& scan)
+std::vector<Vector2d> CornerDetector::extractCorners(const sensor_msgs::msg::LaserScan& scan)
 {
     cv::Mat occupancy              = rasterizeScan(scan);
     std::vector<cv::Point2f> features = detectFeatures(occupancy);
