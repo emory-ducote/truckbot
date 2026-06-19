@@ -20,7 +20,8 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                const double linearVelocityAlpha2,
                                const double angularVelocityAlpha1,
                                const double angularVelocityAlpha2,
-                               const double p0) :
+                               const double p0,
+                               const double associationGateSigmas) :
                                numParticles(numParticles),
                                particles(numParticles),
                                newParticleIncrease(newParticleIncrease),
@@ -34,7 +35,9 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                linearVelocityAlpha2(linearVelocityAlpha2),
                                angularVelocityAlpha1(angularVelocityAlpha1),
                                angularVelocityAlpha2(angularVelocityAlpha2),
-                               p0(p0) {
+                               p0(p0),
+                               associationGateSigmas(associationGateSigmas),
+                               gateThreshold(associationGateSigmas * associationGateSigmas) {
     spdlog::set_level(spdlog::level::info);
     initialSigmas << 0.0, 0.0, 0.0;
 
@@ -136,11 +139,13 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
     Q_j = H_j * nearest->P * H_j.transpose() + Q_t;
     Q_j += 1e-9 * Matrix2d::Identity();
 
-    // chi-squared gate: 2-DOF at 99% confidence = 9.21. The gate (not the raw
-    // likelihood density) decides association: inside the gate the measurement
-    // updates the nearest landmark; outside it is treated as a new feature.
+    // Mahalanobis gate: the gate (not the raw likelihood density) decides
+    // association. The squared Mahalanobis distance is in units of sigma^2, so
+    // an n-sigma gate is simply a threshold of n^2 (gateThreshold). Inside the
+    // gate the measurement updates the nearest landmark; outside it is treated
+    // as a new feature.
     double mahalanobis_sq = innovation.transpose() * Q_j.inverse() * innovation;
-    result.matched = (mahalanobis_sq <= 9.21);
+    result.matched = (mahalanobis_sq <= gateThreshold);
     if (!result.matched) {
         w_j = 1e-9;
     } else {

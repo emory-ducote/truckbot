@@ -26,7 +26,8 @@ class ParticleFilter {
                        const double linearVelocityAlpha2 = 0.05,
                        const double angularVelocityAlpha1 = 0.05,
                        const double angularVelocityAlpha2 = 0.2,
-                       const double p0 = 1e-2);
+                       const double p0 = 1e-2,
+                       const double associationGateSigmas = 3.0);
         ~ParticleFilter();
 
         struct LikelihoodResult {
@@ -69,6 +70,11 @@ class ParticleFilter {
         const double angularVelocityAlpha1;
         const double angularVelocityAlpha2;
         const double p0;
+        // Chi-squared gate on the squared Mahalanobis distance, expressed as a
+        // number of sigmas (associationGateSigmas) and precomputed to its square
+        // so the per-measurement check is a plain comparison.
+        const double associationGateSigmas;
+        const double gateThreshold;
         Matrix2d Q_t;
         Vector3d initialSigmas;
         Particle bestParticle;
