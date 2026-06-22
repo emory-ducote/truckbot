@@ -16,12 +16,7 @@
 using namespace LocalizationHelpers;
 
 class ParticleFilterMiddleware : public rclcpp::Node {
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr landmark_pub_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr all_particles_pose_pub_;
-    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    
   public:
     ParticleFilterMiddleware()
       : Node("particle_filter_middleware")
@@ -224,13 +219,16 @@ class ParticleFilterMiddleware : public rclcpp::Node {
 
     void controlCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-      // u_t is shared with clusterCallback without a lock. This is safe only
-      // under the default single-threaded executor; a multithreaded executor
-      // (or callback groups) would require a mutex around u_t.
       u_t(0) = msg->twist.twist.linear.x;
       u_t(1) = msg->twist.twist.angular.z;
     }
 
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr landmark_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr all_particles_pose_pub_;
+    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr cluster_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr control_sub_;
     std::shared_ptr<ParticleFilter> particleFilter;
