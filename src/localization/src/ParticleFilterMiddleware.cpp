@@ -40,6 +40,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       double angularVelocityAlpha2 = this->declare_parameter<double>("angular_velocity_alpha_2", 0.2);
       double p0 = this->declare_parameter<double>("new_feature_weight", 1e-2);
       double associationGateSigmas = this->declare_parameter<double>("association_gate_sigmas", 3.0);
+      double purgeRange = this->declare_parameter<double>("purge_range", 4.5);
 
 
       particleFilter = std::make_shared<ParticleFilter>(numParticles,
@@ -55,7 +56,8 @@ class ParticleFilterMiddleware : public rclcpp::Node {
                                                              angularVelocityAlpha1,
                                                              angularVelocityAlpha2,
                                                              p0,
-                                                             associationGateSigmas);
+                                                             associationGateSigmas,
+                                                             purgeRange);
 
       u_t << 0.0, 0.0;
 

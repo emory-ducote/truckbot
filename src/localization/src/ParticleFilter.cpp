@@ -21,7 +21,8 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                const double angularVelocityAlpha1,
                                const double angularVelocityAlpha2,
                                const double p0,
-                               const double associationGateSigmas) :
+                               const double associationGateSigmas,
+                               const double purgeRange) :
                                numParticles(numParticles),
                                particles(numParticles),
                                newParticleIncrease(newParticleIncrease),
@@ -37,15 +38,13 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                angularVelocityAlpha2(angularVelocityAlpha2),
                                p0(p0),
                                associationGateSigmas(associationGateSigmas),
-                               gateThreshold(associationGateSigmas * associationGateSigmas) {
+                               gateThreshold(associationGateSigmas * associationGateSigmas),
+                               purgeRange(purgeRange) {
     spdlog::set_level(spdlog::level::info);
     initialSigmas << 0.0, 0.0, 0.0;
 
     Q_t << measurementNoiseRange, 0, 
            0, measurementNoiseBearing;
-    // Single shared RNG (constructing random_device/mt19937 per particle was
-    // wasteful). With initialSigmas == 0 every particle starts at the origin;
-    // raise the sigmas to seed initial pose diversity.
     std::random_device rd;
     std::mt19937 gen(rd());
     std::normal_distribution<> dist_x(0.0, initialSigmas[0]);
@@ -70,7 +69,6 @@ void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u
     double linearVelocity = u_t[0];     // control input linear velocity (m/s)
     double angularVelocity = u_t[1];    // control input angular velocity (rad/s)
     
-    // Apply 4-alpha noise model
     double linearVelStd = std::sqrt(linearVelocityAlpha1 * linearVelocity*linearVelocity + linearVelocityAlpha2 * angularVelocity*angularVelocity);
     double angularVelStd = std::sqrt(angularVelocityAlpha1 * linearVelocity*linearVelocity + angularVelocityAlpha2 * angularVelocity*angularVelocity);
     
@@ -139,11 +137,7 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
     Q_j = H_j * nearest->P * H_j.transpose() + Q_t;
     Q_j += 1e-9 * Matrix2d::Identity();
 
-    // Mahalanobis gate: the gate (not the raw likelihood density) decides
-    // association. The squared Mahalanobis distance is in units of sigma^2, so
-    // an n-sigma gate is simply a threshold of n^2 (gateThreshold). Inside the
-    // gate the measurement updates the nearest landmark; outside it is treated
-    // as a new feature.
+    // mahalanobis gate
     double mahalanobis_sq = innovation.transpose() * Q_j.inverse() * innovation;
     result.matched = (mahalanobis_sq <= gateThreshold);
     if (!result.matched) {
@@ -176,9 +170,6 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
 
     if (newFeature)
     {
-        // New / unassociated feature: weight by a fixed default importance
-        // weight p0 so new features contribute on the same scale as matched
-        // ones (rather than the inconsistent x1.0 it used to apply).
         particle.weight = p0 * particle.weight;
         double global_angle = wrapAngle(particle.x[2] + z_t[1]);
         double mapX = particle.x[0] + z_t[0] * cos(global_angle);
@@ -199,8 +190,7 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
         Vector2d innovation = z_t - z_hat;
         innovation(1) = wrapAngle(innovation(1));
         Vector2d mu_j_t = oldLandmark.x + K * innovation;
-        // Joseph form: keeps the covariance symmetric and positive-definite over
-        // many updates (Q_t is the measurement noise R). More stable than (I-KH)P.
+        // Joseph form
         Matrix2d IKH = Matrix2d::Identity() - K * H;
         Matrix2d sigma_j_t = IKH * oldLandmark.P * IKH.transpose() + K * Q_t * K.transpose();
         Landmark newLandmark(mu_j_t, sigma_j_t);
@@ -231,9 +221,6 @@ std::vector<int> ParticleFilter::systematicResample(const std::vector<double>& w
     int i = 0;
     for (int m = 0; m < M; m++) {
         double u = u0 + (double)m / M;
-        // Bound to M-1: cdf[M-1] is the (normalized) weight sum, which can be
-        // slightly below u due to floating-point accumulation, so an unbounded
-        // walk could index past the end.
         while (i < M - 1 && u > cdf[i]) {
             i++;
         }
@@ -257,11 +244,6 @@ void ParticleFilter::particleWeightUpdate(const Vector2d& z_t)
 
 void ParticleFilter::particlePurgeLandmarks()
 {
-    // Only purge within the near, reliably-sensed band. Beyond 0.5 * maxRange a
-    // missed detection is more likely a detector dropout or occlusion than a real
-    // deletion, so those landmarks are spared; they become purge-eligible again
-    // once the robot drives close enough to confidently re-observe them.
-    const double purgeRange = 0.5 * maxRange;
     for (auto& particle : particles) {
             std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(purgeRange, maxAngle);
             for (const auto& lm : landmarksInRange) {
@@ -287,10 +269,6 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
         weightSum += particles[p].weight;
     }
 
-    // Guard against total weight collapse (all measurements gated out, or
-    // underflow from multiplying many small likelihoods). Normalizing by a
-    // zero / non-finite sum would yield inf/NaN weights and a garbage resample,
-    // so fall back to a uniform distribution and skip resampling this cycle.
     if (!std::isfinite(weightSum) || weightSum <= 0.0) {
         spdlog::warn("Degenerate weight sum ({}); skipping resample, resetting to uniform.", weightSum);
         bestParticle = particles[0];  // all weights equal; any particle is representative
@@ -306,8 +284,6 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
         normalizedWeights[p] = particles[p].weight / weightSum;
     }
 
-    // Capture the best (max-weight) particle BEFORE any resample resets weights
-    // to uniform, so the published estimate keeps a coherent pose+map.
     int bestIdx = 0;
     for (int p = 1; p < numParticles; p++) {
         if (normalizedWeights[p] > normalizedWeights[bestIdx]) bestIdx = p;
@@ -326,33 +302,21 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
         neff = 0.0;
     }
 
-    spdlog::debug("NEFF: {}", neff);
 
-    spdlog::debug("Started Resampling");
 
 
     // Set Neff threshold (e.g., half the number of particles)
     double neff_threshold = neffThreshold * numParticles;
     std::vector<Particle> resampledParticles;
     if (neff < neff_threshold) {
-        spdlog::debug("NEFF BELOW THRESHOLD");
         std::vector<int> resampledIndices = systematicResample(normalizedWeights);
-        spdlog::debug("SYSTEMATIC RESAMPLED");
         resampledParticles.resize(numParticles);
-        spdlog::debug("RESIZED");
         for (int m = 0; m < numParticles; m++) {
-            spdlog::debug("ABOUT TO RESAMPLE {}", m);
-            spdlog::debug("PICKED: {}", particles[resampledIndices[m]].x);
             resampledParticles[m] = particles[resampledIndices[m]];
-            // After resampling the population represents the posterior uniformly,
-            // so reset weights to 1/N.
             resampledParticles[m].weight = 1.0 / numParticles;
-            spdlog::debug("RESAMPLED {}", m);
         }
 
     } else {
-        // No resampling: keep particles but store the normalized accumulated
-        // weights back so they stay bounded and continue accumulating next cycle.
         resampledParticles = particles;
         for (int p = 0; p < numParticles; p++) {
             resampledParticles[p].weight = normalizedWeights[p];
@@ -361,22 +325,14 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
 
     particles = resampledParticles;
 
-
-    spdlog::debug("Started Resampling");
-
     return particles;
 
 }
     
 std::vector<Particle> ParticleFilter::particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt)
 {
-    spdlog::debug("Loop Start");
-    // Weights are NOT reset here: they accumulate across cycles and are reset to
-    // uniform only immediately after a resample (see particleWeightResampling).
-    // Resetting every cycle would discard the measurement evidence from any
-    // cycle that did not trigger a resample.
     particleMotionUpdate(u_t, dt);
-    spdlog::debug("Motion Updated");
+    spdlog::debug(" Updated");
     for (const auto& z_t: z_t_s)
     {
         if (z_t(0) <= maxRange) {

@@ -17,7 +17,7 @@ public:
     CornerDetector(double mapResolution     = 0.05,
                    double mapRange          = 6.0,
                    int    maxCorners        = 100,
-                   double qualityLevel      = 0.01,
+                   double qualityLevel      = 0.15,
                    double minDistance       = 0.3,
                    int    blockSize         = 3,
                    bool   useHarrisDetector = false,
