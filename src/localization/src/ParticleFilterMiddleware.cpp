@@ -1,5 +1,10 @@
 #include "ParticleFilter.h"
 #include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Quaternion.h>
 #include "rclcpp/rclcpp.hpp"
 #include <visualization_msgs/msg/marker_array.hpp>
 #include "nav_msgs/msg/odometry.hpp"
@@ -15,6 +20,8 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr all_particles_pose_pub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   public:
     ParticleFilterMiddleware()
       : Node("particle_filter_middleware")
@@ -64,6 +71,8 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       all_particles_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseArray>("/all_particles_poses", 10);
 
       tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+      tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+      tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
       RCLCPP_INFO(this->get_logger(), "Initialized Filter");
 
@@ -71,27 +80,50 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     double prev_time = 0;
 
   private:
-    void publishHeaviestParticleTransform(const Particle& heaviest)
+    // The particle pose is an estimate of map->base_link. REP-105 requires the
+    // localizer to publish map->odom (the drift correction), and the odom source
+    // (EKF) publishes odom->base_link. Broadcasting the full pose as map->odom
+    // would double-count odometry once TF composes the chain, so we publish the
+    // correction: T_map_odom = T_map_base * T_odom_base^-1.
+    void publishMapToOdom(const Particle& best, const rclcpp::Time& stamp)
     {
+      // T_map_base from the best particle.
+      tf2::Transform T_mb;
+      T_mb.setOrigin(tf2::Vector3(best.x[0], best.x[1], 0.0));
+      tf2::Quaternion q_mb;
+      q_mb.setRPY(0.0, 0.0, best.x[2]);
+      T_mb.setRotation(q_mb);
+
+      // T_odom_base from the odom source, at the measurement time.
+      geometry_msgs::msg::TransformStamped ob_msg;
+      try {
+        ob_msg = tf_buffer_->lookupTransform("odom", "base_link", stamp,
+                                             rclcpp::Duration::from_seconds(0.05));
+      } catch (const tf2::TransformException& e) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                             "map->odom skipped, odom->base_link unavailable: %s", e.what());
+        return;
+      }
+      tf2::Transform T_ob;
+      tf2::fromMsg(ob_msg.transform, T_ob);
+
+      // The correction that re-composes to the particle pose: T_mo * T_ob == T_mb.
+      tf2::Transform T_mo = T_mb * T_ob.inverse();
+
       geometry_msgs::msg::TransformStamped tf_msg;
-      tf_msg.header.stamp = this->now();
+      tf_msg.header.stamp = stamp;
       tf_msg.header.frame_id = "map";
       tf_msg.child_frame_id = "odom";
-      tf_msg.transform.translation.x = heaviest.x[0];
-      tf_msg.transform.translation.y = heaviest.x[1];
-      tf_msg.transform.translation.z = 0.0;
-      double theta = heaviest.x[2];
-      tf_msg.transform.rotation.x = 0.0;
-      tf_msg.transform.rotation.y = 0.0;
-      tf_msg.transform.rotation.z = sin(theta/2.0);
-      tf_msg.transform.rotation.w = cos(theta/2.0);
+      tf_msg.transform = tf2::toMsg(T_mo);
       tf_broadcaster_->sendTransform(tf_msg);
     }
     void clusterCallback(const visualization_msgs::msg::MarkerArray::SharedPtr msg)
     {
       double timestamp;
+      rclcpp::Time meas_stamp;
       if (!msg->markers.empty()) {
           timestamp = msg->markers[0].header.stamp.sec + 1e-9 * msg->markers[0].header.stamp.nanosec;
+          meas_stamp = rclcpp::Time(msg->markers[0].header.stamp);
       }
       else {
         return;
@@ -107,7 +139,10 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       {
         double q = pow(marker.pose.position.x, 2) + pow(marker.pose.position.y, 2);
         double r = std::sqrt(q);
-        double theta1 = wrapAngle(atan2(marker.pose.position.y, marker.pose.position.x));
+        // The laser frame is mounted yawed 180 deg from base_link (see the
+        // base_link->laser static transform), so offset the bearing by pi to
+        // bring the measurement into the robot body frame.
+        double theta1 = wrapAngle(atan2(marker.pose.position.y, marker.pose.position.x) + M_PI);
         Vector2d z_t(r, theta1);
         z_t_s.push_back(z_t);
       }
@@ -115,7 +150,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
 
       // Publish all particle poses
       geometry_msgs::msg::PoseArray all_poses_msg;
-      all_poses_msg.header.stamp = this->now();
+      all_poses_msg.header.stamp = meas_stamp;
       all_poses_msg.header.frame_id = "map";
       all_poses_msg.poses.reserve(result.size());
       for (const auto& particle : result) {
@@ -137,11 +172,11 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       if (!result.empty()) {
         {
           Particle heaviest = particleFilter->getBestParticle();
-          publishHeaviestParticleTransform(heaviest);
+          publishMapToOdom(heaviest, meas_stamp);
 
           // Publish pose estimate
           geometry_msgs::msg::PoseStamped pose_msg;
-          pose_msg.header.stamp = this->now();
+          pose_msg.header.stamp = meas_stamp;
           pose_msg.header.frame_id = "map";
           pose_msg.pose.position.x = heaviest.x[0];
           pose_msg.pose.position.y = heaviest.x[1];

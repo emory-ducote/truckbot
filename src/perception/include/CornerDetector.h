@@ -4,8 +4,6 @@
 #include <opencv2/core.hpp>
 #include "sensor_msgs/msg/laser_scan.hpp"
 
-using namespace Eigen;
-
 // Corner extractor backed by OpenCV's goodFeaturesToTrack (Shi-Tomasi / Harris)
 // corner detector. The laser scan is rasterized into an occupancy image, corner
 // features are detected on that image, then mapped back into the laser frame.
@@ -14,9 +12,9 @@ using namespace Eigen;
 // range, 360 deg FOV). Because the A1's returns get sparse with range (~10 cm
 // between points at 6 m), wallThickness must be large enough to bridge those
 // gaps so walls form continuous structure in the rasterized image.
-class LineExtraction {
+class CornerDetector {
 public:
-    LineExtraction(double mapResolution     = 0.05,
+    CornerDetector(double mapResolution     = 0.05,
                    double mapRange          = 6.0,
                    int    maxCorners        = 100,
                    double qualityLevel      = 0.01,
@@ -28,7 +26,7 @@ public:
                    double minCornerDistance = 0.5);
 
     // Returns corner positions in the laser frame
-    std::vector<Vector2d> extractCorners(const sensor_msgs::msg::LaserScan& scan);
+    std::vector<Eigen::Vector2d> extractCorners(const sensor_msgs::msg::LaserScan& scan);
 
 private:
     // Side length (px) of the square occupancy image
@@ -41,7 +39,7 @@ private:
     std::vector<cv::Point2f> detectFeatures(const cv::Mat& occupancy) const;
 
     // Map feature pixels back to the laser frame, dropping ones near the origin
-    std::vector<Vector2d> toLaserFrame(const std::vector<cv::Point2f>& features) const;
+    std::vector<Eigen::Vector2d> toLaserFrame(const std::vector<cv::Point2f>& features) const;
 
     double mapResolution;      // metres per pixel
     double mapRange;           // half-extent (m) of the square rasterized region
