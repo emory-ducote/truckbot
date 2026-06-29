@@ -19,7 +19,7 @@ public:
         int    wallThickness     = declare_parameter<int>   ("wall_thickness",      2);
         double minCornerDistance = declare_parameter<double>("min_corner_distance", 0.5);
 
-        extractor_ = std::make_shared<CornerDetector>(mapResolution,
+        cornerDetector = std::make_shared<CornerDetector>(mapResolution,
                                                       mapRange,
                                                       maxCorners,
                                                       qualityLevel,
@@ -42,13 +42,12 @@ public:
 private:
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        auto corners = extractor_->extractCorners(*msg);
+        auto corners = cornerDetector->extractCorners(*msg);
 
         visualization_msgs::msg::MarkerArray marker_array;
         int id = 0;
         for (const auto& corner : corners) {
             visualization_msgs::msg::Marker m;
-            // Use the scan timestamp so the particle filter's dt computation is correct
             m.header.frame_id = "laser";
             m.header.stamp    = msg->header.stamp;
             m.ns              = "corners";
@@ -76,7 +75,7 @@ private:
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr corner_pub_;
-    std::shared_ptr<CornerDetector> extractor_;
+    std::shared_ptr<CornerDetector> cornerDetector;
 };
 
 int main(int argc, char* argv[])

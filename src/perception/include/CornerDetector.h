@@ -5,13 +5,10 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 
 // Corner extractor backed by OpenCV's goodFeaturesToTrack (Shi-Tomasi / Harris)
-// corner detector. The laser scan is rasterized into an occupancy image, corner
+// corner detector. 
+
+// The laser scan is rasterized into an occupancy image, corner
 // features are detected on that image, then mapped back into the laser frame.
-//
-// Defaults are tuned for an RPLIDAR A1 (~1 deg angular resolution, 0.15-12 m
-// range, 360 deg FOV). Because the A1's returns get sparse with range (~10 cm
-// between points at 6 m), wallThickness must be large enough to bridge those
-// gaps so walls form continuous structure in the rasterized image.
 class CornerDetector {
 public:
     CornerDetector(double mapResolution     = 0.05,

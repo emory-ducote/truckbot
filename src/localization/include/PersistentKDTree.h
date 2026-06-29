@@ -98,9 +98,6 @@ inline std::shared_ptr<const Node> findMinRec(std::shared_ptr<const Node> root,
 
 inline std::shared_ptr<const Node> findMin(std::shared_ptr<const Node> root, int d, unsigned depth = 0)
 {
-    // `depth` must be the subtree root's actual depth in the tree so that the
-    // split-dimension computation (depth % k) matches. Passing the wrong depth
-    // makes findMin return a non-minimal node and corrupts the tree on delete.
     return findMinRec(root, d, depth);
 }
 
