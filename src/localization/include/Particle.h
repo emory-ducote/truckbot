@@ -1,7 +1,8 @@
 #pragma once
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
-#include <unordered_map>
+#include <map>
+#include <set>
 #include "Landmark.h"
 #include "PersistentKDTree.h"
 
@@ -13,34 +14,35 @@ struct Particle {
                  x(x),
                  P(P) {};
 
-        const std::vector<Vector2d> getLandmarks()
-        { 
+        std::vector<Vector2d> getLandmarks() const
+        {
             std::vector<Vector2d> landmarks;
             collectKDTreeLandmarks(tree, landmarks);
             return landmarks;
         }
         
-        void removeLandmark(const Vector2d& point) 
+        void removeLandmark(const Vector2d& point)
         {
             double points[2] = {point(0), point(1)};
             tree = deleteNode(tree, points);
-            seenLandmarkCounts.erase(point(0)*point(1));
+            seenLandmarkCounts.erase({point(0), point(1)});
         }
 
-        void addLandmark(const Landmark& landmark) { 
+        void addLandmark(const Landmark& landmark) {
             Vector2d point = landmark.x;
             Matrix2d cov = landmark.P;
             double points[2] = {point(0), point(1)};
-            tree = insert(tree, points, cov); 
-            seenLandmarkCounts[point(0)*point(1)] = 1;
+            tree = insert(tree, points, cov);
+            seenLandmarkCounts[{point(0), point(1)}] = 4;
         }
 
-        void updateLandmark(Landmark& oldLandmark, Landmark& newLandmark) 
+        void updateLandmark(Landmark& oldLandmark, Landmark& newLandmark)
         {
+            auto oldKey = std::make_pair(oldLandmark.x(0), oldLandmark.x(1));
+            int oldCount = seenLandmarkCounts.count(oldKey) ? seenLandmarkCounts[oldKey] : 0;
             removeLandmark(oldLandmark.x);
             addLandmark(newLandmark);
-            seenLandmarkCounts[newLandmark.x(0)*newLandmark.x(1)] = std::max(seenLandmarkCounts[oldLandmark.x(0)*oldLandmark.x(1)] + 1, 20);
-            seenLandmarkCounts.erase(oldLandmark.x(0)*oldLandmark.x(1));
+            seenLandmarkCounts[{newLandmark.x(0), newLandmark.x(1)}] = std::min(oldCount + 1, 20);
         }
 
         const Node * searchLandmark(double points[2])
@@ -64,8 +66,8 @@ struct Particle {
         }
 
         std::shared_ptr<const Node> tree = nullptr;
-        std::vector<Vector2d> seenLandmarksThisCycle;
-        std::unordered_map<double, int> seenLandmarkCounts; 
+        std::set<std::pair<double,double>> seenLandmarksThisCycle;
+        std::map<std::pair<double,double>, int> seenLandmarkCounts;
         Vector3d x;
         Matrix3d P;
         double weight = 1.0;

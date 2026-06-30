@@ -1,0 +1,22 @@
+corner_detector_middleware:
+  ros__parameters:
+    # Metres per pixel of the rasterized occupancy image fed to goodFeaturesToTrack
+    map_resolution: 0.05
+    # Half-extent (m) of the square region rasterized around the laser
+    map_range: 6.0
+    # Maximum number of corner features to return
+    max_corners: 100
+    # Minimal accepted quality of corners (fraction of the best corner's measure, 0..1)
+    quality_level: 0.15
+    # Minimum spacing (m) between returned corners
+    min_distance: 0.3
+    # Neighbourhood size (px) for the corner covariation matrix
+    block_size: 3
+    # Use the Harris response instead of the Shi-Tomasi minimal eigenvalue
+    use_harris_detector: false
+    # Harris free parameter (only used when use_harris_detector is true)
+    harris_k: 0.04
+    # Dilation radius (px) used to thicken rasterized walls so corners are detectable
+    wall_thickness: 2
+    # Corners closer than this to the sensor origin are discarded (robot body self-returns)
+    min_corner_distance: 0.5

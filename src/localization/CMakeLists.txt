@@ -20,6 +20,9 @@ find_package(Eigen3 3.3 REQUIRED)
 find_package(fmt REQUIRED)
 find_package(TBB REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 include_directories(
   include
@@ -39,20 +42,11 @@ add_executable(particle_filter
 )
 
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
-ament_target_dependencies(particle_filter rclcpp visualization_msgs nav_msgs tf2_ros)
-
-# add_executable(particle_filter_simulator
-#   src/ParticleFilterSimulator.cpp
-#   src/ParticleFilter.cpp
-# )
-
-# target_link_libraries(particle_filter_simulator Eigen3::Eigen fmt::fmt TBB::tbb)
-# ament_target_dependencies(particle_filter_simulator rclcpp)
+ament_target_dependencies(particle_filter rclcpp visualization_msgs nav_msgs geometry_msgs tf2_ros tf2 tf2_geometry_msgs)
 
 install(TARGETS
   ekf
   particle_filter
-  # particle_filter_simulator
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch/
@@ -62,5 +56,26 @@ install(DIRECTORY launch/
 install(DIRECTORY config/
   DESTINATION share/${PROJECT_NAME}/config
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_persistent_kd_tree test/test_persistent_kd_tree.cpp)
+  if(TARGET test_persistent_kd_tree)
+    target_link_libraries(test_persistent_kd_tree Eigen3::Eigen)
+  endif()
+
+  add_executable(test_particle_filter_simulator
+    test/test_particle_filter_simulator.cpp
+    src/ParticleFilter.cpp
+  )
+  target_link_libraries(test_particle_filter_simulator Eigen3::Eigen fmt::fmt TBB::tbb)
+  ament_target_dependencies(test_particle_filter_simulator rclcpp)
+
+  ament_add_test(test_particle_filter_simulator
+    COMMAND $<TARGET_FILE:test_particle_filter_simulator>
+    GENERATE_RESULT_FOR_RETURN_CODE_ZERO
+  )
+endif()
 
 ament_package()

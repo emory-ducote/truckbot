@@ -1,8 +1,7 @@
-#include <numeric>   
+#include <numeric>
 #include <random>
 #include <iostream>
 #include <spdlog/spdlog.h>
-#include <execution>
 #include "spdlog/fmt/ostr.h"
 #include "ParticleFilter.h"
 
@@ -20,7 +19,10 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                const double linearVelocityAlpha1,
                                const double linearVelocityAlpha2,
                                const double angularVelocityAlpha1,
-                               const double angularVelocityAlpha2) : 
+                               const double angularVelocityAlpha2,
+                               const double p0,
+                               const double associationGateSigmas,
+                               const double purgeRange) :
                                numParticles(numParticles),
                                particles(numParticles),
                                newParticleIncrease(newParticleIncrease),
@@ -33,23 +35,25 @@ ParticleFilter::ParticleFilter(const int numParticles,
                                linearVelocityAlpha1(linearVelocityAlpha1),
                                linearVelocityAlpha2(linearVelocityAlpha2),
                                angularVelocityAlpha1(angularVelocityAlpha1),
-                               angularVelocityAlpha2(angularVelocityAlpha2) {
+                               angularVelocityAlpha2(angularVelocityAlpha2),
+                               p0(p0),
+                               associationGateSigmas(associationGateSigmas),
+                               gateThreshold(associationGateSigmas * associationGateSigmas),
+                               purgeRange(purgeRange) {
     spdlog::set_level(spdlog::level::info);
     initialSigmas << 0.0, 0.0, 0.0;
 
     Q_t << measurementNoiseRange, 0, 
            0, measurementNoiseBearing;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<> dist_x(0.0, initialSigmas[0]);
+    std::normal_distribution<> dist_y(0.0, initialSigmas[1]);
+    std::normal_distribution<> dist_theta(0.0, initialSigmas[2]);
+
     for (int m = 0; m < numParticles; m++)
     {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-
-        std::normal_distribution<> dist_x(0.0, initialSigmas[0]);
-        std::normal_distribution<> dist_y(0.0, initialSigmas[1]);
-        std::normal_distribution<> dist_theta(0.0, initialSigmas[2]);
-
         Vector3d noisy_state(dist_x(gen), dist_y(gen), dist_theta(gen));
-
         particles[m] = Particle(noisy_state);
     }
 
@@ -57,18 +61,16 @@ ParticleFilter::ParticleFilter(const int numParticles,
 
 ParticleFilter::~ParticleFilter(){}
 
-void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u_t, const double dt) 
+void ParticleFilter::sampleNewParticlePose(Particle& particle, const Vector2d& u_t, const double dt)
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    static thread_local std::mt19937 gen(std::random_device{}());
     std::normal_distribution<> standardNormal(0.0, 1.0);
 
     double linearVelocity = u_t[0];     // control input linear velocity (m/s)
     double angularVelocity = u_t[1];    // control input angular velocity (rad/s)
     
-    // Apply 4-alpha noise model
-    double linearVelStd = std::sqrt(linearVelocityAlpha1 * std::abs(linearVelocity) + linearVelocityAlpha2 * std::abs(angularVelocity));
-    double angularVelStd = std::sqrt(angularVelocityAlpha1 * std::abs(linearVelocity) + angularVelocityAlpha2 * std::abs(angularVelocity));
+    double linearVelStd = std::sqrt(linearVelocityAlpha1 * linearVelocity*linearVelocity + linearVelocityAlpha2 * angularVelocity*angularVelocity);
+    double angularVelStd = std::sqrt(angularVelocityAlpha1 * linearVelocity*linearVelocity + angularVelocityAlpha2 * angularVelocity*angularVelocity);
     
     double noisyLinearVel = linearVelocity + linearVelStd * standardNormal(gen);
     double noisyAngularVel = angularVelocity + angularVelStd * standardNormal(gen);
@@ -100,7 +102,8 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
     const Node * nearest = particle.searchLandmark(points);
     if (nearest == nullptr) {
         spdlog::debug("Measurement {} No nearest!", z_t);
-        result.weight = 1e-9; 
+        result.weight = 1e-9;
+        result.matched = false;
         result.z_hat.setZero();
         result.H.setZero();
         result.Q.setIdentity();
@@ -109,9 +112,11 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
         return result;
     }
     
-    double deltaX = nearest->point[0] - particle.x[0] + 1e-9;
-    double deltaY = nearest->point[1] - particle.x[1] + 1e-9;
-    double q = pow(deltaX, 2) + pow(deltaY, 2);
+    double deltaX = nearest->point[0] - particle.x[0];
+    double deltaY = nearest->point[1] - particle.x[1];
+    double q = deltaX * deltaX + deltaY * deltaY;
+    // Guard against a landmark coinciding with the robot (division by r/q below).
+    if (q < 1e-12) q = 1e-12;
     double r = std::sqrt(q);
     double theta = wrapAngle(atan2(deltaY, deltaX) - particle.x[2]);
     
@@ -127,23 +132,22 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
     innovation(1) = wrapAngle(innovation(1));
     Matrix2d Q_j;
     double w_j;
-    
-    if (std::abs(innovation(0)) > 1.0 || std::abs(innovation(1)) > 0.3) {
+
+    // measurement covariance
+    Q_j = H_j * nearest->P * H_j.transpose() + Q_t;
+    Q_j += 1e-9 * Matrix2d::Identity();
+
+    // mahalanobis gate
+    double mahalanobis_sq = innovation.transpose() * Q_j.inverse() * innovation;
+    result.matched = (mahalanobis_sq <= gateThreshold);
+    if (!result.matched) {
         w_j = 1e-9;
-        Q_j = Matrix2d::Identity() * 10;
-    }
-    else {
-        // measurement covariance
-        Q_j = H_j * nearest->P * H_j.transpose() + Q_t;
-
-        // small perturbation may make things more stable
-        Q_j += 1e-9 * Matrix2d::Identity();
-
-        double exponent = -0.5 * innovation.transpose() * Q_j.inverse() * innovation;
+    } else {
+        double exponent = -0.5 * mahalanobis_sq;
         double normalizer = std::pow(2 * M_PI, z_t.size() / 2.0) * std::sqrt(Q_j.determinant());
         w_j = std::exp(exponent) / normalizer;
     }
-    
+
     result.weight = w_j;
     result.z_hat = z_hat_j;
     result.H = H_j;
@@ -159,14 +163,14 @@ ParticleFilter::LikelihoodResult ParticleFilter::updateLikelihoodCorrespondence(
 void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t) 
 {
 
-    auto [w, z_hat, H, Q, prevX, prevP] = this->updateLikelihoodCorrespondence(particle, z_t);
+    auto [w, matched, z_hat, H, Q, prevX, prevP] = this->updateLikelihoodCorrespondence(particle, z_t);
 
-    bool newFeature = (newParticleThreshold > w);
+    bool newFeature = !matched;
     // spdlog::debug("New Feature {}", newFeature);
 
-    if (newFeature) 
+    if (newFeature)
     {
-        particle.weight = particle.weight;
+        particle.weight = p0 * particle.weight;
         double global_angle = wrapAngle(particle.x[2] + z_t[1]);
         double mapX = particle.x[0] + z_t[0] * cos(global_angle);
         double mapY = particle.x[1] + z_t[0] * sin(global_angle);
@@ -176,20 +180,22 @@ void ParticleFilter::landmarkUpdate(Particle& particle, const Vector2d& z_t)
             sin(particle.x[2] + z_t[1]),  z_t[0] * cos(particle.x[2] + z_t[1]);
         MatrixXd sigma_j_t = H_j * Q_t * H_j.transpose();
         particle.addLandmark(Landmark(mu_j_t, sigma_j_t));
-        particle.seenLandmarksThisCycle.push_back(mu_j_t);
+        particle.seenLandmarksThisCycle.insert({mu_j_t(0), mu_j_t(1)});
     }
     else 
     {
         particle.weight = w*particle.weight;
         Landmark oldLandmark(prevX, prevP);
-        MatrixXd K = oldLandmark.P * H.transpose() * Q.inverse();
+        Matrix2d K = oldLandmark.P * H.transpose() * Q.inverse();
         Vector2d innovation = z_t - z_hat;
         innovation(1) = wrapAngle(innovation(1));
         Vector2d mu_j_t = oldLandmark.x + K * innovation;
-        MatrixXd sigma_j_t = (MatrixXd::Identity(2,2) - K * H) * oldLandmark.P;
+        // Joseph form
+        Matrix2d IKH = Matrix2d::Identity() - K * H;
+        Matrix2d sigma_j_t = IKH * oldLandmark.P * IKH.transpose() + K * Q_t * K.transpose();
         Landmark newLandmark(mu_j_t, sigma_j_t);
         particle.updateLandmark(oldLandmark, newLandmark);
-        particle.seenLandmarksThisCycle.push_back(mu_j_t);
+        particle.seenLandmarksThisCycle.insert({mu_j_t(0), mu_j_t(1)});
     }
 
 }
@@ -215,7 +221,7 @@ std::vector<int> ParticleFilter::systematicResample(const std::vector<double>& w
     int i = 0;
     for (int m = 0; m < M; m++) {
         double u = u0 + (double)m / M;
-        while (u > cdf[i]) {
+        while (i < M - 1 && u > cdf[i]) {
             i++;
         }
         indexes[m] = i;
@@ -226,50 +232,32 @@ std::vector<int> ParticleFilter::systematicResample(const std::vector<double>& w
 
 void ParticleFilter::particleMotionUpdate(const Vector2d& u_t, const double dt)
 {
-    std::for_each(std::execution::par, particles.begin(), particles.end(),
-        [&](Particle& particle) {
-            this->sampleNewParticlePose(particle, u_t, dt);
-        });
+    for (auto& particle : particles)
+        sampleNewParticlePose(particle, u_t, dt);
 }
 
 void ParticleFilter::particleWeightUpdate(const Vector2d& z_t)
 {
-    std::for_each(std::execution::par, particles.begin(), particles.end(),
-        [&](Particle& particle) {
-            this->landmarkUpdate(particle, z_t);
-        });
-}   
+    for (auto& particle : particles)
+        landmarkUpdate(particle, z_t);
+}
 
 void ParticleFilter::particlePurgeLandmarks()
 {
-    std::for_each(std::execution::par, particles.begin(), particles.end(),
-        [&](Particle& particle) {
-            std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(maxRange, maxAngle);
-            std::vector<Vector2d>& seenLandmarksThisCycle = particle.seenLandmarksThisCycle;
-            std::vector<Vector2d> inRangeButNotSeen;
+    for (auto& particle : particles) {
+            std::vector<Vector2d> landmarksInRange = particle.landmarksInRange(purgeRange, maxAngle);
             for (const auto& lm : landmarksInRange) {
-                bool seen = false;
-                for (const auto& seenLm : seenLandmarksThisCycle) {
-                    if ((lm - seenLm).norm() < 1e-6) { 
-                        seen = true;
-                        break;
-                    }
-                }
-                if (!seen) {
-                    inRangeButNotSeen.push_back(lm);
-                }
-            }
-            for (auto& nS: inRangeButNotSeen) 
-            {
-                if (particle.seenLandmarkCounts[nS(0)*nS(1)] <= 0) {
-                    particle.removeLandmark(nS);
-                }
-                else {
-                    particle.seenLandmarkCounts[nS(0)*nS(1)] -= 1;
+                auto key = std::make_pair(lm(0), lm(1));
+                if (particle.seenLandmarksThisCycle.count(key)) continue;
+                auto it = particle.seenLandmarkCounts.find(key);
+                if (it == particle.seenLandmarkCounts.end() || it->second <= 0) {
+                    particle.removeLandmark(lm);
+                } else {
+                    it->second -= 1;
                 }
             }
             particle.seenLandmarksThisCycle.clear();
-        });
+    }
 }
 
 std::vector<Particle> ParticleFilter::particleWeightResampling()
@@ -281,11 +269,26 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
         weightSum += particles[p].weight;
     }
 
+    if (!std::isfinite(weightSum) || weightSum <= 0.0) {
+        spdlog::warn("Degenerate weight sum ({}); skipping resample, resetting to uniform.", weightSum);
+        bestParticle = particles[0];  // all weights equal; any particle is representative
+        for (auto& particle : particles) {
+            particle.weight = 1.0 / numParticles;
+        }
+        return particles;
+    }
+
     // collect and normalize weights
     std::vector<double> normalizedWeights(numParticles);
     for (int p = 0; p < numParticles; p++) {
         normalizedWeights[p] = particles[p].weight / weightSum;
     }
+
+    int bestIdx = 0;
+    for (int p = 1; p < numParticles; p++) {
+        if (normalizedWeights[p] > normalizedWeights[bestIdx]) bestIdx = p;
+    }
+    bestParticle = particles[bestIdx];
 
     // Compute Neff (effective number of particles)
     double neff = 0.0;
@@ -299,36 +302,28 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
         neff = 0.0;
     }
 
-    spdlog::info("NEFF: {}", neff);
 
-    spdlog::debug("Started Resampling");
 
 
     // Set Neff threshold (e.g., half the number of particles)
     double neff_threshold = neffThreshold * numParticles;
     std::vector<Particle> resampledParticles;
     if (neff < neff_threshold) {
-        spdlog::debug("NEFF BELOW THRESHOLD");
         std::vector<int> resampledIndices = systematicResample(normalizedWeights);
-        spdlog::debug("SYSTEMATIC RESAMPLED");
         resampledParticles.resize(numParticles);
-        spdlog::debug("RESIZED");
         for (int m = 0; m < numParticles; m++) {
-            spdlog::debug("ABOUT TO RESAMPLE {}", m);
-            spdlog::debug("PICKED: {}", particles[resampledIndices[m]].x);
             resampledParticles[m] = particles[resampledIndices[m]];
-            spdlog::debug("RESAMPLED {}", m);
+            resampledParticles[m].weight = 1.0 / numParticles;
         }
 
     } else {
-        // No resampling, just return current particles
         resampledParticles = particles;
+        for (int p = 0; p < numParticles; p++) {
+            resampledParticles[p].weight = normalizedWeights[p];
+        }
     }
 
     particles = resampledParticles;
-
-
-    spdlog::debug("Started Resampling");
 
     return particles;
 
@@ -336,9 +331,8 @@ std::vector<Particle> ParticleFilter::particleWeightResampling()
     
 std::vector<Particle> ParticleFilter::particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt)
 {
-    spdlog::debug("Loop Start");
     particleMotionUpdate(u_t, dt);
-    spdlog::debug("Motion Updated");
+    spdlog::debug(" Updated");
     for (const auto& z_t: z_t_s)
     {
         if (z_t(0) <= maxRange) {

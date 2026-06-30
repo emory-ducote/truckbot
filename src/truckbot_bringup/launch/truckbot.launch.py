@@ -41,11 +41,11 @@ def generate_launch_description():
                 os.path.join(navigation_dir, 'launch', 'navigation.launch.py')
             )
         ),
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(
-        #         os.path.join(perception_dir, 'launch', 'voxelization.launch.py')
-        #     )
-        # ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(perception_dir, 'launch', 'corner_detector.launch.py')
+            )
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(imu_dir, 'launch', 'imu.launch.py')

@@ -20,6 +20,7 @@ find_package(fmt REQUIRED)
 find_package(laser_geometry REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
+find_package(OpenCV REQUIRED)
 
 
 INCLUDE_DIRECTORIES(
@@ -44,9 +45,17 @@ target_link_libraries(voxelization fmt::fmt)
 ament_target_dependencies(voxelization rclcpp sensor_msgs laser_geometry 
                                            visualization_msgs pcl_conversions PCL)
 
+add_executable(corner_detector
+  src/CornerDetectorMiddleware.cpp
+  src/CornerDetector.cpp
+)
+target_link_libraries(corner_detector ${OpenCV_LIBS})
+ament_target_dependencies(corner_detector rclcpp sensor_msgs visualization_msgs OpenCV)
+
 install(TARGETS
   feature_detector
   voxelization
+  corner_detector
   DESTINATION lib/${PROJECT_NAME})
 
 

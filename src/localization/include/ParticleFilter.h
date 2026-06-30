@@ -25,11 +25,15 @@ class ParticleFilter {
                        const double linearVelocityAlpha1 = 0.2,
                        const double linearVelocityAlpha2 = 0.05,
                        const double angularVelocityAlpha1 = 0.05,
-                       const double angularVelocityAlpha2 = 0.2);
+                       const double angularVelocityAlpha2 = 0.2,
+                       const double p0 = 1e-2,
+                       const double associationGateSigmas = 3.0,
+                       const double purgeRange = 4.5);
         ~ParticleFilter();
 
         struct LikelihoodResult {
             double weight;
+            bool matched;        
             Eigen::Vector2d z_hat;
             Eigen::Matrix2d H;
             Eigen::Matrix2d Q;
@@ -45,7 +49,9 @@ class ParticleFilter {
         void particleWeightUpdate(const Vector2d& z_t);
         void particlePurgeLandmarks();
         std::vector<Particle> particleWeightResampling();
-        std::vector<Particle> particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt); 
+        std::vector<Particle> particleFilterLoop(const Vector2d& u_t, std::vector<Vector2d> z_t_s, const double dt);
+        const Particle& getBestParticle() const { return bestParticle; }
+        const std::vector<Particle>& getParticles() const { return particles; }
     private:
         const int numParticles;
         std::vector<Particle> particles;
@@ -60,8 +66,13 @@ class ParticleFilter {
         const double linearVelocityAlpha2;
         const double angularVelocityAlpha1;
         const double angularVelocityAlpha2;
-        Matrix2d Q_t; 
+        const double p0;
+        const double associationGateSigmas;
+        const double gateThreshold;
+        const double purgeRange;
+        Matrix2d Q_t;
         Vector3d initialSigmas;
+        Particle bestParticle;
 };
 
 #endif

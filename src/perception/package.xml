@@ -11,6 +11,7 @@
   <depend>visualization_msgs</depend>
   <depend>laser_geometry</depend>
   <depend>pcl_conversions</depend>
+  <depend>libopencv-dev</depend>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
