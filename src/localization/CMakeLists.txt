@@ -44,9 +44,18 @@ add_executable(particle_filter
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
 ament_target_dependencies(particle_filter rclcpp visualization_msgs nav_msgs geometry_msgs tf2_ros tf2 tf2_geometry_msgs)
 
+add_executable(occupancy_grid
+  src/OccupancyGridMiddleware.cpp
+  src/OccupancyGrid.cpp
+)
+
+target_link_libraries(occupancy_grid Eigen3::Eigen)
+ament_target_dependencies(occupancy_grid rclcpp sensor_msgs nav_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs)
+
 install(TARGETS
   ekf
   particle_filter
+  occupancy_grid
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch/

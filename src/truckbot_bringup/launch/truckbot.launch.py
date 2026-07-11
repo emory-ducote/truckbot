@@ -56,5 +56,10 @@ def generate_launch_description():
                 os.path.join(rplidar_dir, 'launch', 'rplidar_a1_launch.py')
             )
         ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(localization_dir, 'launch', 'occupancy_grid.launch.py')
+            )
+        ),
 
     ])
