@@ -53,11 +53,20 @@ add_executable(pure_pursuit_controller
 target_link_libraries(pure_pursuit_controller)
 ament_target_dependencies(pure_pursuit_controller rclcpp nav_msgs geometry_msgs std_msgs)
 
+add_executable(cost_grid
+  src/CostGridMiddleware.cpp
+  src/CostGrid.cpp
+)
+
+target_link_libraries(cost_grid)
+ament_target_dependencies(cost_grid rclcpp nav_msgs std_msgs)
+
 install(TARGETS
   path_tracker
   spline_generator
   simple_path_server
   pure_pursuit_controller
+  cost_grid
   DESTINATION lib/${PROJECT_NAME})
 
 

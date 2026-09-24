@@ -1,0 +1,7 @@
+cost_grid_middleware:
+  ros__parameters:
+    collision_radius: 0.23 # meters, robot circumscribed radius + pose error margin
+    clearance_radius: 0.45 # meters, past this an obstacle adds no cost
+    occupied_threshold: 65 
+    occupancy_topic: "/map"
+    cost_grid_topic: "/cost_grid"
