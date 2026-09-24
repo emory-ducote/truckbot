@@ -1,10 +1,10 @@
 occupancy_grid:
   ros__parameters:
     resolution: 0.05 # meters/cell
-    width: 200 # cells
-    height: 200 # cells
-    origin_x: -5.0 # meters, world coord of cell (0,0)
-    origin_y: -5.0 # meters, world coord of cell (0,0)
+    width: 400 # cells
+    height: 400 # cells
+    origin_x: -10.0 # meters, world coord of cell (0,0)
+    origin_y: -10.0 # meters, world coord of cell (0,0)
     log_odds_occupied: 0.85 # added to a cell on an occupied hit
     log_odds_free: -0.4 # added to a cell traversed by a beam
     log_odds_min: -2.0 # clamp floor
