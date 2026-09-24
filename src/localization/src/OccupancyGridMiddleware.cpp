@@ -36,7 +36,8 @@ class OccupancyGridMiddleware : public rclcpp::Node {
           "/scan", 10,
           std::bind(&OccupancyGridMiddleware::scan_callback, this, std::placeholders::_1));
 
-      map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/map", 10);
+      auto map_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
+      map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/map", map_qos);
 
       tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
       tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -57,7 +58,7 @@ class OccupancyGridMiddleware : public rclcpp::Node {
       try {
         tf = tf_buffer_->lookupTransform(map_frame_, msg->header.frame_id,
                                          msg->header.stamp,
-                                         rclcpp::Duration::from_seconds(0.05));
+                                         rclcpp::Duration::from_seconds(0.3));
       } catch (const tf2::TransformException& e) {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                              "scan dropped, %s->%s unavailable: %s",

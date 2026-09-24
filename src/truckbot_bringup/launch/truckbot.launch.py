@@ -37,9 +37,9 @@ def generate_launch_description():
             )
         ),
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(navigation_dir, 'launch', 'navigation.launch.py')
-            )
+           PythonLaunchDescriptionSource(
+               os.path.join(navigation_dir, 'launch', 'navigation.launch.py')
+           )
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
