@@ -11,6 +11,7 @@ def generate_launch_description():
     path_tracker_config = os.path.join(config_dir, 'config', 'path_tracker.yaml')
     simple_path_server_config = os.path.join(config_dir, 'config', 'simple_path_server.yaml')
     spline_generator_config = os.path.join(config_dir, 'config', 'spline_generator.yaml')
+    cost_grid_config = os.path.join(config_dir, 'config', 'cost_grid.yaml')
     
     return LaunchDescription([
         Node(
@@ -36,5 +37,11 @@ def generate_launch_description():
             executable='pure_pursuit_controller',
             name='pure_pursuit_controller_middleware',
             parameters=[pure_pursuit_config]
+        ),
+        Node(
+            package='navigation',
+            executable='cost_grid',
+            name='cost_grid_middleware',
+            parameters=[cost_grid_config]
         )
     ])

@@ -44,16 +44,58 @@ void CostGrid::computeCosts()
         {
             int i = index(col, row);
             if (occupancy[i] >= occupiedThreshold) {
-                growObstacle(col, row);
+                std::vector<bool> visited(costs.size(), false);
+                growObstacle(col, row, col, row, visited);
             }
         }
     }
 }
 
-void CostGrid::growObstacle(int col, int row)
+double CostGrid::distanceToObstacle(int col, int row, int obstacleCol, int obstacleRow) const
 {
+    double dx = static_cast<double>(col - obstacleCol);
+    double dy = static_cast<double>(row - obstacleRow);
+    return std::hypot(dx, dy) * resolution;
+}
 
-   
+void CostGrid::growObstacle(int col, int row, int obstacleCol, int obstacleRow, std::vector<bool>& visited)
+{
+    if (!inBounds(col, row))
+    {
+        return;
+    }
+
+    int i = index(col, row);
+    if (visited[i])
+    {
+        return;
+    }
+    visited[i] = true;
+
+    double distance = distanceToObstacle(col, row, obstacleCol, obstacleRow);
+    if (distance > clearanceRadius)
+    {
+        return;
+    }
+
+    costs[i] = std::max(costs[i], costFromDistance(distance));
+
+    if (distanceToObstacle(col + 1, row, obstacleCol, obstacleRow) <= clearanceRadius)
+    {
+        growObstacle(col + 1, row, obstacleCol, obstacleRow, visited);
+    }
+    if (distanceToObstacle(col - 1, row, obstacleCol, obstacleRow) <= clearanceRadius)
+    {
+        growObstacle(col - 1, row, obstacleCol, obstacleRow, visited);
+    }
+    if (distanceToObstacle(col, row + 1, obstacleCol, obstacleRow) <= clearanceRadius)
+    {
+        growObstacle(col, row + 1, obstacleCol, obstacleRow, visited);
+    }
+    if (distanceToObstacle(col, row - 1, obstacleCol, obstacleRow) <= clearanceRadius)
+    {
+        growObstacle(col, row - 1, obstacleCol, obstacleRow, visited);
+    }
 }
 
 double CostGrid::costFromDistance(double distance) const

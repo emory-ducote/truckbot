@@ -30,7 +30,8 @@ class CostGrid {
 
     private:
         double costFromDistance(double distance) const;
-        void growObstacle(int col, int row);
+        double distanceToObstacle(int col, int row, int obstacleCol, int obstacleRow) const;
+        void growObstacle(int col, int row, int obstacleCol, int obstacleRow, std::vector<bool>& visited);
 
         bool inBounds(int col, int row) const;
         int index(int col, int row) const { return row * width + col; }
