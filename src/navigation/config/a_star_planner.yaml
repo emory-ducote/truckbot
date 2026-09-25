@@ -1,0 +1,8 @@
+a_star_planner_middleware:
+  ros__parameters:
+    cost_grid_topic: "/cost_grid"
+    goal_topic: "/goal_pose"
+    pose_topic: "/heaviest_particle_pose"
+    path_topic: "/global_path"
+    cost_thresh: 65
+    replan_period_ms: 500
