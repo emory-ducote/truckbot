@@ -60,6 +60,10 @@ class AStarPlannerMiddleware : public rclcpp::Node {
                                 static_cast<int>(msg->info.height),
                                 msg->info.origin.position.x,
                                 msg->info.origin.position.y);
+      grid_resolution_ = msg->info.resolution;
+      grid_origin_x_ = msg->info.origin.position.x;
+      grid_origin_y_ = msg->info.origin.position.y;
+      grid_frame_ = msg->header.frame_id;
       cost_grid_received_ = true;
     }
 
@@ -90,10 +94,45 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       if (!goal_received_ || !pose_received_ || !cost_grid_received_) {
         return;
       }
+
+      std::pair<int, int> start = world_to_cell(current_pose_.x, current_pose_.y);
+      std::pair<int, int> goal = world_to_cell(goal_pose_.x, goal_pose_.y);
+
+      auto path = a_star_planner_->findPath(start, goal);
+      if (path.empty()) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                             "A* found no path.");
+        return;
+      }
+
+      publish_path(path);
     }
 
-    void publish_path()
+    std::pair<int, int> world_to_cell(double x, double y) const
     {
+      int col = static_cast<int>(std::floor((x - grid_origin_x_) / grid_resolution_));
+      int row = static_cast<int>(std::floor((y - grid_origin_y_) / grid_resolution_));
+      return {col, row};
+    }
+
+    void publish_path(const std::vector<std::pair<int, int>>& path)
+    {
+      nav_msgs::msg::Path path_msg;
+      path_msg.header.stamp = this->now();
+      path_msg.header.frame_id = grid_frame_;
+      path_msg.poses.reserve(path.size());
+
+      for (const auto& [col, row] : path) {
+        geometry_msgs::msg::PoseStamped pose;
+        pose.header = path_msg.header;
+        pose.pose.position.x = grid_origin_x_ + (col + 0.5) * grid_resolution_;
+        pose.pose.position.y = grid_origin_y_ + (row + 0.5) * grid_resolution_;
+        pose.pose.position.z = 0.0;
+        pose.pose.orientation.w = 1.0;
+        path_msg.poses.push_back(pose);
+      }
+
+      path_pub_->publish(path_msg);
     }
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr cost_grid_sub_;
@@ -106,6 +145,10 @@ class AStarPlannerMiddleware : public rclcpp::Node {
     std::string goal_topic_;
     std::string pose_topic_;
     std::string path_topic_;
+    std::string grid_frame_;
+    double grid_resolution_ = 1.0;
+    double grid_origin_x_ = 0.0;
+    double grid_origin_y_ = 0.0;
     navigation::VehiclePose goal_pose_;
     navigation::VehiclePose current_pose_;
     bool goal_received_ = false;
