@@ -61,12 +61,30 @@ add_executable(cost_grid
 target_link_libraries(cost_grid)
 ament_target_dependencies(cost_grid rclcpp nav_msgs std_msgs)
 
+add_executable(a_star_planner
+  src/AStarPlannerMiddleware.cpp
+  src/AStarPlanner.cpp
+)
+
+target_link_libraries(a_star_planner)
+ament_target_dependencies(a_star_planner rclcpp nav_msgs geometry_msgs)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_a_star_planner
+    test/test_a_star_planner.cpp
+    src/AStarPlanner.cpp
+  )
+endif()
+
 install(TARGETS
   path_tracker
   spline_generator
   simple_path_server
   pure_pursuit_controller
   cost_grid
+  a_star_planner
   DESTINATION lib/${PROJECT_NAME})
 
 
