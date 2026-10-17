@@ -69,6 +69,15 @@ add_executable(a_star_planner
 target_link_libraries(a_star_planner)
 ament_target_dependencies(a_star_planner rclcpp nav_msgs geometry_msgs)
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_a_star_planner
+    test/test_a_star_planner.cpp
+    src/AStarPlanner.cpp
+  )
+endif()
+
 install(TARGETS
   path_tracker
   spline_generator

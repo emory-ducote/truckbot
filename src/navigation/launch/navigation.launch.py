@@ -9,7 +9,7 @@ def generate_launch_description():
     
     pure_pursuit_config = os.path.join(config_dir, 'config', 'pure_pursuit.yaml')
     path_tracker_config = os.path.join(config_dir, 'config', 'path_tracker.yaml')
-    simple_path_server_config = os.path.join(config_dir, 'config', 'simple_path_server.yaml')
+    a_star_planner_config = os.path.join(config_dir, 'config', 'a_star_planner.yaml')
     spline_generator_config = os.path.join(config_dir, 'config', 'spline_generator.yaml')
     cost_grid_config = os.path.join(config_dir, 'config', 'cost_grid.yaml')
     
@@ -22,9 +22,9 @@ def generate_launch_description():
         ),
         Node(
             package='navigation',
-            executable='simple_path_server',
-            name='simple_path_server_middleware',
-            parameters=[simple_path_server_config]
+            executable='a_star_planner',
+            name='a_star_planner_middleware',
+            parameters=[a_star_planner_config]
         ),
         Node(
             package='navigation',
