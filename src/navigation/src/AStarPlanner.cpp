@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <queue>
+#include <unordered_map>
+#include <unordered_set>
 
 AStarPlanner::AStarPlanner(int8_t costThresh)
     : costThresh(costThresh)
@@ -74,72 +78,74 @@ std::vector<std::pair<int, int>> AStarPlanner::reconstructPath(std::shared_ptr<A
     return path;
 }
 
+std::vector<std::pair<int, int>> AStarPlanner::findPath(const std::pair<int, int>& start,
+                                                        const std::pair<int, int>& goal)
+{
+    if (!inBounds(start.first, start.second) || !inBounds(goal.first, goal.second)) {
+        std::cerr << "AStarPlanner: start or goal out of bounds\n";
+        return {};
+    }
 
+    const int startIdx = index(start.first, start.second);
+    const int goalIdx = index(goal.first, goal.second);
 
-/* TODO - translate this
+    auto startNode = std::make_shared<AStarNode>(start.first, start.second, 0.0,
+        distanceHeuristic(start.first, start.second, goal.first, goal.second));
 
-def find_path(grid: np.ndarray, start: Tuple[int, int], 
-              goal: Tuple[int, int]) -> List[Tuple[int, int]]:
-    """
-    Find the optimal path using A* algorithm.
-    
-    Args:
-        grid: 2D numpy array (0 = free space, 1 = obstacle)
-        start: Starting position (x, y)
-        goal: Goal position (x, y)
-    
-    Returns:
-        List of positions representing the optimal path
-    """
-    # Initialize start node
-    start_node = create_node(
-        position=start,
-        g=0,
-        h=calculate_heuristic(start, goal)
-    )
-    
-    # Initialize open and closed sets
-    open_list = [(start_node['f'], start)]  # Priority queue
-    open_dict = {start: start_node}         # For quick node lookup
-    closed_set = set()                      # Explored nodes
-    
-    while open_list:
-        # Get node with lowest f value
-        _, current_pos = heapq.heappop(open_list)
-        current_node = open_dict[current_pos]
-        
-        # Check if we've reached the goal
-        if current_pos == goal:
-            return reconstruct_path(current_node)
+    std::priority_queue<std::pair<double, int>,
+                        std::vector<std::pair<double, int>>,
+                        std::greater<>> openList;
+    openList.emplace(startNode->f, startIdx);
+
+    std::unordered_map<int, std::shared_ptr<AStarNode>> openDict;
+    openDict[startIdx] = startNode;
+    std::unordered_set<int> closedSet;
+
+    while (!openList.empty()) {
+        auto [f, currentIdx] = openList.top();
+        openList.pop();
+
+        if (closedSet.count(currentIdx)) {
+            continue;
+        }
+
+        if (currentIdx == goalIdx) {
+            return reconstructPath(openDict[currentIdx]);
+        }
+
+        closedSet.insert(currentIdx);
+
+        auto currentNode = openDict[currentIdx];
+
+        for (const auto& [neighborCol, neighborRow] : getNeighbors(currentNode->col, currentNode->row)) {
+            const int neighborIdx = index(neighborCol, neighborRow);
+            if (closedSet.count(neighborIdx))
+            {
+                continue;
+            }
+
+            auto tempG = currentNode->g + 
+                           distanceHeuristic(currentNode->col, currentNode->row, neighborCol, neighborRow);
             
-        closed_set.add(current_pos)
-        
-        # Explore neighbors
-        for neighbor_pos in get_valid_neighbors(grid, current_pos):
-            # Skip if already explored
-            if neighbor_pos in closed_set:
-                continue
-                
-            # Calculate new path cost
-            tentative_g = current_node['g'] + calculate_heuristic(current_pos, neighbor_pos)
-            
-            # Create or update neighbor
-            if neighbor_pos not in open_dict:
-                neighbor = create_node(
-                    position=neighbor_pos,
-                    g=tentative_g,
-                    h=calculate_heuristic(neighbor_pos, goal),
-                    parent=current_node
-                )
-                heapq.heappush(open_list, (neighbor['f'], neighbor_pos))
-                open_dict[neighbor_pos] = neighbor
-            elif tentative_g < open_dict[neighbor_pos]['g']:
-                # Found a better path to the neighbor
-                neighbor = open_dict[neighbor_pos]
-                neighbor['g'] = tentative_g
-                neighbor['f'] = tentative_g + neighbor['h']
-                neighbor['parent'] = current_node
-    
-    return []  # No path found
 
-*/
+            if (!openDict.count(neighborIdx)) 
+            {
+                auto neighborNode = std::make_shared<AStarNode>(neighborCol, neighborRow, tempG,
+                                    distanceHeuristic(neighborCol, neighborRow, goal.first, goal.second), currentNode);
+                openDict[neighborIdx] = neighborNode;
+                openList.emplace(neighborNode->f, neighborIdx);
+            }
+            else if (tempG < openDict[neighborIdx]->g)
+            {
+                auto neighborNode = openDict[neighborIdx];
+                neighborNode->g = tempG;
+                neighborNode->f = tempG + neighborNode->h;
+                neighborNode->parent = currentNode;
+                openList.emplace(neighborNode->f, neighborIdx);
+            }
+        }
+    }
+
+
+    return {};
+}

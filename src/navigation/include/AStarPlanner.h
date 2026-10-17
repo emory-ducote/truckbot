@@ -33,6 +33,8 @@ class AStarPlanner {
                       int height,
                       double originX,
                       double originY);
+        std::vector<std::pair<int, int>> findPath(const std::pair<int, int>& start,
+                                                  const std::pair<int, int>& goal);
 
     private:
         double distanceHeuristic(int firstCol, int firstRow, int secondCol, int secondRow) const;
