@@ -10,5 +10,6 @@ occupancy_grid:
     log_odds_min: -2.0 # clamp floor
     log_odds_max: 3.5 # clamp ceiling
     max_range: 9.0 # meters, beams beyond this are ignored
+    min_range: 0.3 # meters, beams shorter than this (hits on the chassis) are ignored
     publish_rate: 1.0 # Hz
     map_frame: "map"

@@ -4,7 +4,8 @@
 Reads the bag with the pure-Python ``mcap`` reader (no ROS environment
 required) and writes a single self-contained HTML report containing:
 
-  * 2D trajectory map  - odometry path vs. particle-filter estimate
+  * 2D trajectory map  - EKF odometry path vs. particle-filter estimate, drawn
+                         over the final /map and /cost_grid occupancy grids
   * Pose vs. time      - x / y / yaw for odom vs. heaviest particle
   * Velocities         - measured (odom) vs. commanded (cmd_vel)
   * IMU                - angular velocity and linear acceleration
@@ -49,6 +50,9 @@ ENCODER_TOPICS = [
     "/encoder/left_rear",
     "/encoder/right_rear",
 ]
+# OccupancyGrid topics drawn under the trajectory. Only the last message of
+# each is kept, since the grids are republished whole as they fill in.
+MAP_TOPICS = ["/map", "/cost_grid"]
 
 
 def quat_to_yaw(x: float, y: float, z: float, w: float) -> float:
@@ -76,13 +80,15 @@ def load_bag(mcap_path: str) -> dict:
     All time stamps use the bag receive time (``log_time_ns``) so every
     series shares one consistent clock, normalised to seconds from start.
     """
-    odom = defaultdict(list)          # t, x, y, yaw, v, w
+    odom = defaultdict(list)          # EKF pose from /tf odom->base_link: t, x, y, yaw
+    odom_vel = defaultdict(list)      # /odom twist (it carries no pose): t, v, w
     pf = defaultdict(list)            # heaviest particle pose: t, x, y, yaw
     cmd = defaultdict(list)           # commanded: t, v, w
     imu = defaultdict(list)           # t, wx, wy, wz, ax, ay, az
     enc = {topic: defaultdict(list) for topic in ENCODER_TOPICS}
     scan = defaultdict(list)          # t, rmin, rmean, rmax, valid
     landmarks = []                    # per-frame: {t, x[], y[]} for the slider
+    grids = {}                        # topic -> latest OccupancyGrid as arrays
 
     for m in read_ros2_messages(mcap_path):
         topic = m.channel.topic
@@ -90,17 +96,20 @@ def load_bag(mcap_path: str) -> dict:
         msg = m.ros_msg
 
         if topic == "/odom":
-            p = msg.pose.pose
             tw = msg.twist.twist
-            odom["t"].append(t)
-            odom["x"].append(p.position.x)
-            odom["y"].append(p.position.y)
-            odom["yaw"].append(
-                quat_to_yaw(p.orientation.x, p.orientation.y,
-                            p.orientation.z, p.orientation.w)
-            )
-            odom["v"].append(tw.linear.x)
-            odom["w"].append(tw.angular.z)
+            odom_vel["t"].append(t)
+            odom_vel["v"].append(tw.linear.x)
+            odom_vel["w"].append(tw.angular.z)
+
+        elif topic == "/tf":
+            for tf in msg.transforms:
+                if (tf.header.frame_id, tf.child_frame_id) != ("odom", "base_link"):
+                    continue
+                tr, q = tf.transform.translation, tf.transform.rotation
+                odom["t"].append(t)
+                odom["x"].append(tr.x)
+                odom["y"].append(tr.y)
+                odom["yaw"].append(quat_to_yaw(q.x, q.y, q.z, q.w))
 
         elif topic == "/heaviest_particle_pose":
             p = msg.pose
@@ -144,8 +153,19 @@ def load_bag(mcap_path: str) -> dict:
             ys = np.array([mk.pose.position.y for mk in msg.markers], dtype=float)
             landmarks.append({"t": t, "x": xs, "y": ys})
 
+        elif topic in MAP_TOPICS:
+            info = msg.info
+            cells = np.asarray(bytearray(msg.data) if isinstance(msg.data, bytes)
+                               else msg.data).astype(np.uint8).view(np.int8)
+            grids[topic] = {
+                "data": cells.reshape(info.height, info.width),
+                "res": info.resolution,
+                "ox": info.origin.position.x,
+                "oy": info.origin.position.y,
+            }
+
     # Normalise all timelines to seconds from the earliest stamp.
-    starts = [s["t"][0] for s in (odom, pf, cmd, imu, scan) if s.get("t")]
+    starts = [s["t"][0] for s in (odom, odom_vel, pf, cmd, imu, scan) if s.get("t")]
     starts += [e["t"][0] for e in enc.values() if e.get("t")]
     starts += [landmarks[0]["t"]] if landmarks else []
     t0 = min(starts) if starts else 0.0
@@ -161,12 +181,14 @@ def load_bag(mcap_path: str) -> dict:
 
     return {
         "odom": to_np(odom),
+        "odom_vel": to_np(odom_vel),
         "pf": to_np(pf),
         "cmd": to_np(cmd),
         "imu": to_np(imu),
         "enc": {k: to_np(v) for k, v in enc.items()},
         "scan": to_np(scan),
         "landmarks": landmarks,
+        "grids": grids,
     }
 
 
@@ -188,9 +210,49 @@ DYNAMICS_ROWS = [
 ]
 
 
+def grid_crop(grids: dict, pts_x, pts_y, margin: float = 1.0):
+    """Index window covering every known grid cell and the given points.
+
+    The grids are much larger than the area actually driven, so cropping keeps
+    the trajectory panel framed on the run and the HTML small. Returns slices
+    into the grid arrays, or None if no grid is present.
+    """
+    if not grids:
+        return None
+    g0 = next(iter(grids.values()))
+    res, ox, oy = g0["res"], g0["ox"], g0["oy"]
+    h, w = g0["data"].shape
+    known = np.zeros((h, w), dtype=bool)
+    for topic, g in grids.items():
+        if g["data"].shape == (h, w):
+            # Map cells are known once >= 0; cost cells matter once > 0.
+            known |= g["data"] > 0 if topic == "/cost_grid" else g["data"] >= 0
+    rows, cols = np.nonzero(known)
+    xs = list(ox + (cols + 0.5) * res) + list(pts_x)
+    ys = list(oy + (rows + 0.5) * res) + list(pts_y)
+    if not xs:
+        return None
+    c0 = int(np.clip((min(xs) - margin - ox) / res, 0, w))
+    c1 = int(np.clip((max(xs) + margin - ox) / res + 1, 0, w))
+    r0 = int(np.clip((min(ys) - margin - oy) / res, 0, h))
+    r1 = int(np.clip((max(ys) + margin - oy) / res + 1, 0, h))
+    return slice(r0, r1), slice(c0, c1)
+
+
+def grid_heatmap(g: dict, crop, **kw) -> go.Heatmap:
+    """OccupancyGrid as a heatmap in world coordinates (assumes no rotation)."""
+    rs, cs = crop
+    z = g["data"][rs, cs].astype(float)
+    res = g["res"]
+    x = g["ox"] + (np.arange(cs.start, cs.stop) + 0.5) * res
+    y = g["oy"] + (np.arange(rs.start, rs.stop) + 0.5) * res
+    return go.Heatmap(x=x, y=y, z=z, showscale=False, **kw)
+
+
 def fig_dashboard(data: dict) -> go.Figure:
     """Trajectory map (left) beside the stacked, x-linked dynamics (right)."""
-    odom, pf, cmd = data["odom"], data["pf"], data["cmd"]
+    odom, odom_vel = data["odom"], data["odom_vel"]
+    pf, cmd = data["pf"], data["cmd"]
     imu, enc, scan = data["imu"], data["enc"], data["scan"]
     nrows = len(DYNAMICS_ROWS)
 
@@ -207,6 +269,30 @@ def fig_dashboard(data: dict) -> go.Figure:
         specs=specs,
         subplot_titles=["2D Trajectory: odom vs. PF"] + DYNAMICS_ROWS,
     )
+
+    # --- left: maps (drawn first so they sit under the trajectory) ---
+    grids = data["grids"]
+    crop = grid_crop(grids,
+                     np.concatenate([odom.get("x", []), pf.get("x", [])]),
+                     np.concatenate([odom.get("y", []), pf.get("y", [])]))
+    map_traces = {}  # topic -> trace index, for the map toggle buttons
+    if crop is not None and "/map" in grids:
+        # Unknown (-1) -> NaN so it stays transparent; free white, occupied black.
+        hm = grid_heatmap(grids["/map"], crop, name="/map", zmin=0, zmax=100,
+                          colorscale="Greys",
+                          hovertemplate="x=%{x:.2f} y=%{y:.2f}<br>occ=%{z}<extra>/map</extra>")
+        hm.z = np.where(hm.z < 0, np.nan, hm.z)
+        map_traces["/map"] = len(fig.data)
+        fig.add_trace(hm, row=1, col=1)
+    if crop is not None and "/cost_grid" in grids:
+        # Zero cost -> NaN so the occupancy map shows through.
+        hm = grid_heatmap(grids["/cost_grid"], crop, name="/cost_grid",
+                          zmin=0, zmax=100, colorscale="YlOrRd", opacity=0.6,
+                          visible=False,
+                          hovertemplate="x=%{x:.2f} y=%{y:.2f}<br>cost=%{z}<extra>/cost_grid</extra>")
+        hm.z = np.where(hm.z <= 0, np.nan, hm.z)
+        map_traces["/cost_grid"] = len(fig.data)
+        fig.add_trace(hm, row=1, col=1)
 
     # --- left: trajectory ---
     if len(odom.get("x", [])):
@@ -228,18 +314,18 @@ def fig_dashboard(data: dict) -> go.Figure:
     def add(row, x, y, **kw):
         fig.add_trace(go.Scatter(x=x, y=y, **kw), row=row, col=2)
 
-    have_odom = len(odom.get("t", []))
     have_cmd = len(cmd.get("t", []))
-    if have_odom:
+    if len(odom.get("t", [])):
         add(1, odom["t"], odom["x"], name="odom", legendgroup="odom",
             line=dict(color="#1f77b4"), showlegend=False)
         add(2, odom["t"], odom["y"], legendgroup="odom",
             line=dict(color="#1f77b4"), showlegend=False)
         add(3, odom["t"], odom["yaw"], legendgroup="odom",
             line=dict(color="#1f77b4"), showlegend=False)
-        add(4, odom["t"], odom["v"], legendgroup="odom",
+    if len(odom_vel.get("t", [])):
+        add(4, odom_vel["t"], odom_vel["v"], name="odom", legendgroup="odom",
             line=dict(color="#1f77b4"), showlegend=False)
-        add(5, odom["t"], odom["w"], legendgroup="odom",
+        add(5, odom_vel["t"], odom_vel["w"], name="odom", legendgroup="odom",
             line=dict(color="#1f77b4"), showlegend=False)
     if len(pf.get("t", [])):
         add(1, pf["t"], pf["x"], name="PF", legendgroup="pf",
@@ -275,6 +361,22 @@ def fig_dashboard(data: dict) -> go.Figure:
         legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
         margin=dict(t=80, r=140),
     )
+
+    # Buttons to pick which map(s) sit under the trajectory.
+    if map_traces:
+        def vis(*topics):
+            idx = [map_traces[t] for t in map_traces]
+            return [dict(visible=[t in topics for t in map_traces]), idx]
+        options = [("map", ("/map",)), ("cost grid", ("/cost_grid",)),
+                   ("both", ("/map", "/cost_grid")), ("none", ())]
+        fig.update_layout(updatemenus=[dict(
+            type="buttons", direction="right", showactive=True, active=0,
+            x=fig.layout.xaxis.domain[1], y=1.0, xanchor="right", yanchor="bottom",
+            pad=dict(b=24),
+            buttons=[dict(label=label, method="restyle", args=vis(*topics))
+                     for label, topics in options
+                     if all(t in map_traces for t in topics)],
+        )])
     return fig
 
 
@@ -425,7 +527,8 @@ def main() -> None:
     data = load_bag(mcap_path)
 
     counts = {
-        "odom": len(data["odom"].get("t", [])),
+        "odom (tf)": len(data["odom"].get("t", [])),
+        "odom (twist)": len(data["odom_vel"].get("t", [])),
         "pf": len(data["pf"].get("t", [])),
         "cmd_vel": len(data["cmd"].get("t", [])),
         "imu": len(data["imu"].get("t", [])),

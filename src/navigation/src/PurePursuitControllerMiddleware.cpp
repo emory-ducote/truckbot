@@ -49,6 +49,14 @@ private:
 		for (const auto& pose : msg->poses) {
 			path.emplace_back(pose.pose.position.x, pose.pose.position.y, pose.pose.orientation.z);
 		}
+		if (!path.empty()) {
+			// A local path ending somewhere new means a new goal, so re-arm after a finished mission
+			if (!have_goal_ || path.back().euclideanDistanceTo(final_goal_) > goal_tolerance_) {
+				mission_done = false;
+			}
+			final_goal_ = path.back();
+			have_goal_ = true;
+		}
 		purePursuitController->setLocalPath(path);
 	}
 
@@ -66,8 +74,9 @@ private:
 			auto omega = purePursuitController->computeControl(localLookahead, linear_velocity_);
 			RCLCPP_INFO(this->get_logger(), "PurePursuit omega chosen: %f", omega);
 			geometry_msgs::msg::Twist cmd_msg;
-			double distance = purePursuitController->getVehiclePose().euclideanDistanceTo(globalLookahead);
-			RCLCPP_INFO(this->get_logger(), "Dist from point: %f", distance);
+			// Stop on distance to the final goal, not the lookahead point (which trails the vehicle by Ld)
+			double distance = purePursuitController->getVehiclePose().euclideanDistanceTo(final_goal_);
+			RCLCPP_INFO(this->get_logger(), "Dist to goal: %f", distance);
 			if ((distance < goal_tolerance_) || (mission_done))
 			{
 				cmd_msg.linear.x = 0.0;
@@ -114,6 +123,8 @@ private:
 	double goal_tolerance_;
 	bool pose_received_ = false;
 	bool mission_done = false;
+	bool have_goal_ = false;
+	navigation::VehiclePose final_goal_;
 };
 
 int main(int argc, char * argv[])

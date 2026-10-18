@@ -21,7 +21,9 @@ EncoderDriver::EncoderDriver(const uint8_t& chip,
       encoderCPR(encoderCPR),
       encoderTicksPerRevolution(encoderTicksPerRevolution),
       encoderTicks(0),
-      lastEncoderRead(0)
+      lastEncoderTicks(0),
+      lastEncoderRead(0),
+      lastDtPrintStamp(0.0)
 { 
     previousCalculationStamp = std::chrono::duration<double>(
             std::chrono::system_clock::now().time_since_epoch()
@@ -69,7 +71,12 @@ double EncoderDriver::getWheelSpeeds()
             std::chrono::system_clock::now().time_since_epoch()
         ).count();
     double dt = curTime - previousCalculationStamp;
-    std::cout << "DT: " << dt << std::endl;
+    // Called at the odom publish rate, so only print dt once a second.
+    if (curTime - lastDtPrintStamp >= 1.0)
+    {
+        std::cout << "DT: " << dt << std::endl;
+        lastDtPrintStamp = curTime;
+    }
     float rotations = static_cast<float>(encoderTicks - lastEncoderTicks) 
                                       / (encoderCPR * encoderTicksPerRevolution);
     float omega  = (rotations * 2.0 * M_PI) / dt; // rad/s

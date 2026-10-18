@@ -14,4 +14,4 @@ particle_filter:
     angular_velocity_alpha_1: 0.05
     association_gate_sigmas: 3.0 # data-association gate
     new_feature_weight: 0.01 
-    purge_range: 4.5 # meters
+    purge_range: 3.0 # meters

@@ -30,6 +30,7 @@ class EncoderDriver {
         int lastEncoderTicks;
         int lastEncoderRead;
         double previousCalculationStamp;
+        double lastDtPrintStamp;
         int handle;     
 };
 

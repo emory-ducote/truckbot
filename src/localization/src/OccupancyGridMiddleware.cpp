@@ -24,13 +24,14 @@ class OccupancyGridMiddleware : public rclcpp::Node {
       double logOddsMin = this->declare_parameter<double>("log_odds_min", -2.0);
       double logOddsMax = this->declare_parameter<double>("log_odds_max", 3.5);
       double maxRange = this->declare_parameter<double>("max_range", 9.0);
+      double minRange = this->declare_parameter<double>("min_range", 0.0);
       double publishRate = this->declare_parameter<double>("publish_rate", 1.0);
       map_frame_ = this->declare_parameter<std::string>("map_frame", "map");
 
       grid_ = std::make_shared<OccupancyGrid>(resolution, width, height,
                                               originX, originY,
                                               logOddsOccupied, logOddsFree,
-                                              logOddsMin, logOddsMax, maxRange);
+                                              logOddsMin, logOddsMax, maxRange, minRange);
 
       scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
           "/scan", 10,

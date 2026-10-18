@@ -12,7 +12,8 @@ OccupancyGrid::OccupancyGrid(double resolution,
                              double log_odds_free,
                              double log_odds_min,
                              double log_odds_max,
-                             double max_range)
+                             double max_range,
+                             double min_range)
     : resolution(resolution),
       width(width),
       height(height),
@@ -23,6 +24,7 @@ OccupancyGrid::OccupancyGrid(double resolution,
       logOddsMin(log_odds_min),
       logOddsMax(log_odds_max),
       maxRange(max_range),
+      minRange(min_range),
       logOdds(static_cast<size_t>(width) * static_cast<size_t>(height), 0.0)
 {
 }
@@ -40,7 +42,7 @@ void OccupancyGrid::integrateScan(const Vector3d& sensor_pose,
         float r = ranges[i];
         int endRow; int endCol; int egoRow; int egoCol;
         bool valid = !std::isnan(r) && !std::isinf(r)
-                     && r > 0.0 && r <= maxRange;
+                     && r >= minRange && r > 0.0 && r <= maxRange;
         if (!valid) continue;
 
         double beam_angle = sensor_pose.z() + angle;   // yaw + beam bearing

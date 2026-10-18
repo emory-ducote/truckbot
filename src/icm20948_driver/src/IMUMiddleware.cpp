@@ -45,10 +45,21 @@ class IMUPublisher : public rclcpp::Node {
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<IMUPublisher>();
+    std::shared_ptr<IMUPublisher> node;
+    try {
+        node = std::make_shared<IMUPublisher>();
+    } catch (const std::exception& e) {
+        RCLCPP_FATAL(rclcpp::get_logger("imu_middleware"), "Failed to initialize IMU: %s", e.what());
+        rclcpp::shutdown();
+        return 1;
+    }
     rclcpp::on_shutdown([node]() {
         RCLCPP_INFO(node->get_logger(), "Shutdown callback triggered.");
-        node->imu->resetMaster();
+        try {
+            node->imu->resetMaster();
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(node->get_logger(), "IMU reset on shutdown failed: %s", e.what());
+        }
     });
     rclcpp::spin(node);
     rclcpp::shutdown();

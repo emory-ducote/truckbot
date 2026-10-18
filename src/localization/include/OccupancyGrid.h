@@ -18,7 +18,8 @@ class OccupancyGrid {
                       double log_odds_free = -0.4,
                       double log_odds_min = -2.0,
                       double log_odds_max = 3.5,
-                      double max_range = 9.0);
+                      double max_range = 9.0,
+                      double min_range = 0.0);
         ~OccupancyGrid();
 
         void integrateScan(const Vector3d& sensor_pose,
@@ -50,6 +51,7 @@ class OccupancyGrid {
         double logOddsMin;
         double logOddsMax;
         double maxRange;
+        double minRange;
 
         // Row-major log-odds storage, size width * height.
         std::vector<double> logOdds;

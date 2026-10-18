@@ -1,0 +1,4 @@
+recorder:
+  record_dir: "/mnt/storage/truckbot_bags" # bags are written to <record_dir>/truckbot_<timestamp>
+  # Plotly report rendered into the bag dir when recording stops ("" disables)
+  report_script: "/mnt/storage/repos/truckbot/viz/plot_bag.py"

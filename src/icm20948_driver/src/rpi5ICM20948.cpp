@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
+#include <stdexcept>
 #include <spdlog/spdlog.h>
+#include <fmt/format.h>
 
  
 rpi5ICM20948::rpi5ICM20948(const uint8_t device) {
@@ -19,8 +21,19 @@ rpi5ICM20948::rpi5ICM20948(const uint8_t device) {
     uint8_t reg;
     handle = lgI2cOpen(1, device, 0);
     if (handle < 0) {
-        spdlog::error("Error opening IMU");
-    }     
+        throw std::runtime_error(fmt::format("Error opening I2C bus 1 for IMU (lgpio error {})", handle));
+    }
+
+    // verify id before anything else, so a missing chip fails fast instead of hanging in a busy-wait
+    lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
+    std::this_thread::sleep_for(std::chrono::microseconds(duration));
+    int whoAmI = lgI2cReadByteData(handle, WHO_AM_I);
+    if (whoAmI != DEVICE_ID) {
+        lgI2cClose(handle);
+        throw std::runtime_error(fmt::format(
+            "No ICM20948 at I2C address 0x{:02X} (WHO_AM_I returned {}, expected 0x{:02X}); check wiring with `i2cdetect -y 1`",
+            device, whoAmI, DEVICE_ID));
+    }
 
     resetMaster();
 
@@ -62,13 +75,6 @@ rpi5ICM20948::rpi5ICM20948(const uint8_t device) {
     lgI2cWriteByteData(handle, USER_CTRL, reg | 0b00100000);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
 
-    // verify id
-    uint8_t whoAmI = lgI2cReadByteData(handle, WHO_AM_I);
-    if (whoAmI != DEVICE_ID)
-    {
-        spdlog::error("Device ID wrong for icm20948\n");
-    }
-
     // set mag to poweroff, sleep, then set to continuious mode 1
     writeMagReg(MAG_CONTROL_2, 0x00);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
@@ -101,10 +107,19 @@ void rpi5ICM20948::resetMaster() {
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, PWR_MGMT_1, 0x80);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
-    uint8_t reset = lgI2cReadByteData(handle, PWR_MGMT_1);
-    while (reset & 0b10000000) {
-        usleep(5);
-        reset = lgI2cReadByteData(handle, PWR_MGMT_1);
+    waitForBitClear(PWR_MGMT_1, 0b10000000, 5);
+}
+
+void rpi5ICM20948::waitForBitClear(uint8_t reg, uint8_t mask, int pollMicros) {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+    int value = lgI2cReadByteData(handle, reg);
+    while (value < 0 || (value & mask)) {
+        if (std::chrono::steady_clock::now() > deadline) {
+            throw std::runtime_error(fmt::format(
+                "Timed out waiting on IMU register 0x{:02X} (last read {})", reg, value));
+        }
+        std::this_thread::sleep_for(std::chrono::microseconds(pollMicros));
+        value = lgI2cReadByteData(handle, reg);
     }
 }
 
@@ -119,11 +134,7 @@ uint8_t rpi5ICM20948::readMagReg(uint8_t reg) {
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
-    uint8_t reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
-    while (reset & 0b00100000) {
-        usleep(1000);
-        reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
-    }
+    waitForBitClear(I2C_MST_STATUS, 0b00100000, 1000);
 
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x30);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
@@ -143,11 +154,7 @@ void rpi5ICM20948::writeMagReg(uint8_t reg, uint8_t data) {
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
     lgI2cWriteByteData(handle, REG_BANK_SEL, 0x00);
     std::this_thread::sleep_for(std::chrono::microseconds(duration));
-    uint8_t reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
-    while (reset & 0b00100000) {
-        std::this_thread::sleep_for(std::chrono::microseconds(duration));
-        reset = lgI2cReadByteData(handle, I2C_MST_STATUS);
-    }
+    waitForBitClear(I2C_MST_STATUS, 0b00100000, duration);
 }
 
 int rpi5ICM20948::getMagnetometerData(float &ux, float &uy, float &uz) {
