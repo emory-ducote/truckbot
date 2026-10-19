@@ -28,6 +28,7 @@ map
 - perception
 - icm20948_driver
 - health
+- dashboard
 
 ## Building
 

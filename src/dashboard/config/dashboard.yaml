@@ -1,0 +1,3 @@
+dashboard:
+  ros__parameters:
+    port: 8080 # http://<robot-ip>:<port>

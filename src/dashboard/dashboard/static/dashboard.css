@@ -1,0 +1,11 @@
+body { font-family: sans-serif; background: #1e1e1e; color: #eee; margin: 16px; }
+#overall { padding: 16px; border-radius: 8px; font-size: 1.5em; font-weight: bold; margin-bottom: 16px; color: #111; }
+#tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.tile { padding: 12px; border-radius: 8px; color: #111; }
+.name { font-weight: bold; word-break: break-all; }
+.detail { font-size: 0.9em; margin-top: 4px; min-height: 1.2em; }
+.stamp { font-size: 0.8em; margin-top: 4px; opacity: 0.7; }
+.GOOD { background: #4caf50; }
+.DEGRADED { background: #ffc107; }
+.FAILED { background: #f44336; }
+.INIT, .STALE { background: #9e9e9e; }
