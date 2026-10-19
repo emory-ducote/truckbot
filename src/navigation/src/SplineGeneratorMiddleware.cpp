@@ -57,8 +57,6 @@ class SplineGeneratorMiddleware : public rclcpp::Node {
       auto splinePath = splineGenerator->generateSpline();
       if (splinePath.empty()) {
         RCLCPP_WARN(this->get_logger(), "Generated spline is empty. No local path published.");
-        health_state_ = truckbot_msgs::msg::Heartbeat::DEGRADED;
-        health_detail_ = "generated spline is empty";
         return;
       }
 
