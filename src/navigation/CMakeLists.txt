@@ -13,6 +13,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(truckbot_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -28,7 +29,7 @@ add_executable(path_tracker
 )
 
 target_link_libraries(path_tracker)
-ament_target_dependencies(path_tracker rclcpp nav_msgs std_msgs)
+ament_target_dependencies(path_tracker rclcpp truckbot_msgs nav_msgs std_msgs)
 
 add_executable(spline_generator
   src/SplineGeneratorMiddleware.cpp
@@ -36,14 +37,14 @@ add_executable(spline_generator
 )
 
 target_link_libraries(spline_generator)
-ament_target_dependencies(spline_generator rclcpp nav_msgs std_msgs)
+ament_target_dependencies(spline_generator rclcpp truckbot_msgs nav_msgs std_msgs)
 
 add_executable(simple_path_server
   src/SimplePathServerMiddleware.cpp
 )
 
 target_link_libraries(simple_path_server)
-ament_target_dependencies(simple_path_server rclcpp nav_msgs geometry_msgs)
+ament_target_dependencies(simple_path_server rclcpp truckbot_msgs nav_msgs geometry_msgs)
 
 add_executable(pure_pursuit_controller
   src/PurePursuitControllerMiddleware.cpp
@@ -51,7 +52,7 @@ add_executable(pure_pursuit_controller
 )
 
 target_link_libraries(pure_pursuit_controller)
-ament_target_dependencies(pure_pursuit_controller rclcpp nav_msgs geometry_msgs std_msgs)
+ament_target_dependencies(pure_pursuit_controller rclcpp truckbot_msgs nav_msgs geometry_msgs std_msgs)
 
 add_executable(cost_grid
   src/CostGridMiddleware.cpp
@@ -59,7 +60,7 @@ add_executable(cost_grid
 )
 
 target_link_libraries(cost_grid)
-ament_target_dependencies(cost_grid rclcpp nav_msgs std_msgs)
+ament_target_dependencies(cost_grid rclcpp truckbot_msgs nav_msgs std_msgs)
 
 add_executable(a_star_planner
   src/AStarPlannerMiddleware.cpp
@@ -67,7 +68,7 @@ add_executable(a_star_planner
 )
 
 target_link_libraries(a_star_planner)
-ament_target_dependencies(a_star_planner rclcpp nav_msgs geometry_msgs)
+ament_target_dependencies(a_star_planner rclcpp truckbot_msgs nav_msgs geometry_msgs)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)

@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 
@@ -10,6 +11,9 @@ public:
   SimplePathServerMiddleware()
   : Node("simple_path_server_middleware")
   {
+    heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+    heartbeat_timer_ = this->create_wall_timer(
+        std::chrono::seconds(1), std::bind(&SimplePathServerMiddleware::heartbeat_callback, this));
     path_frame_ = this->declare_parameter<std::string>("path_frame", "map");
     path_topic_ = this->declare_parameter<std::string>("path_topic", "/global_path");
     publish_rate_ = this->declare_parameter<double>("publish_rate", 5.0);
@@ -34,6 +38,16 @@ public:
   }
 
 private:
+  void heartbeat_callback()
+  {
+    auto heartbeat = truckbot_msgs::msg::Heartbeat();
+    heartbeat.stamp = this->now();
+    heartbeat.node_name = this->get_name();
+    heartbeat.state = health_state_;
+    heartbeat.detail = health_detail_;
+    heartbeat_pub_->publish(heartbeat);
+  }
+
   void preparePathMessage()
   {
     local_path_msg_.header.frame_id = path_frame_;
@@ -74,6 +88,8 @@ private:
       pose.header = local_path_msg_.header;
     }
     local_path_pub_->publish(local_path_msg_);
+    health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+    health_detail_ = "";
     RCLCPP_DEBUG(this->get_logger(), "Published global path with %zu points.", local_path_msg_.poses.size());
   }
 
@@ -85,6 +101,10 @@ std::string path_frame_;
 
   nav_msgs::msg::Path local_path_msg_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr local_path_pub_;
+  rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+  rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+  uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+  std::string health_detail_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

@@ -1,4 +1,5 @@
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -8,6 +9,9 @@ class JoyListener : public rclcpp::Node {
   public:
       JoyListener() : Node("joy_listener")
       {
+        heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+        heartbeat_timer_ = this->create_wall_timer(
+            std::chrono::seconds(1), std::bind(&JoyListener::heartbeat_callback, this));
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "/joy", 10, std::bind(&JoyListener::joyCallback, this, std::placeholders::_1));
         cmd_vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
@@ -15,6 +19,16 @@ class JoyListener : public rclcpp::Node {
       }
   
   private:
+      void heartbeat_callback()
+      {
+        auto heartbeat = truckbot_msgs::msg::Heartbeat();
+        heartbeat.stamp = this->now();
+        heartbeat.node_name = this->get_name();
+        heartbeat.state = health_state_;
+        heartbeat.detail = health_detail_;
+        heartbeat_pub_->publish(heartbeat);
+      }
+
       void joyCallback(const sensor_msgs::msg::Joy::SharedPtr msg) 
       {
         double left_stick_x = msg->axes[1];  
@@ -30,6 +44,8 @@ class JoyListener : public rclcpp::Node {
         auto bool_message = std_msgs::msg::Bool();
         bool_message.data = up;
         cmd_actuator_publisher_->publish(bool_message);
+        health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+        health_detail_ = "";
         RCLCPP_INFO(this->get_logger(), "Received data: left stick: %f, right stick %f, Y button: %d, A button %d",
                     left_stick_x, right_stick_x, y_button, a_button);
       }
@@ -37,6 +53,10 @@ class JoyListener : public rclcpp::Node {
       rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
       rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
       rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr cmd_actuator_publisher_;
+      rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+      rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+      uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+      std::string health_detail_;
   };
 
 int main(int argc, char** argv) {

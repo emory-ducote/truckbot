@@ -13,6 +13,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(truckbot_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
@@ -33,7 +34,7 @@ add_executable(feature_detector
 )
 
 target_link_libraries(feature_detector fmt::fmt)
-ament_target_dependencies(feature_detector rclcpp sensor_msgs laser_geometry 
+ament_target_dependencies(feature_detector rclcpp truckbot_msgs sensor_msgs laser_geometry 
                                            visualization_msgs pcl_conversions PCL)
   
 add_executable(voxelization
@@ -42,7 +43,7 @@ add_executable(voxelization
 )
 
 target_link_libraries(voxelization fmt::fmt)
-ament_target_dependencies(voxelization rclcpp sensor_msgs laser_geometry 
+ament_target_dependencies(voxelization rclcpp truckbot_msgs sensor_msgs laser_geometry 
                                            visualization_msgs pcl_conversions PCL)
 
 add_executable(corner_detector
@@ -50,7 +51,7 @@ add_executable(corner_detector
   src/CornerDetector.cpp
 )
 target_link_libraries(corner_detector ${OpenCV_LIBS})
-ament_target_dependencies(corner_detector rclcpp sensor_msgs visualization_msgs OpenCV)
+ament_target_dependencies(corner_detector rclcpp truckbot_msgs sensor_msgs visualization_msgs OpenCV)
 
 install(TARGETS
   feature_detector

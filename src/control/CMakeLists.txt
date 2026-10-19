@@ -12,6 +12,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(truckbot_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -27,6 +28,7 @@ add_executable(teleop
 
 ament_target_dependencies(teleop
   rclcpp
+  truckbot_msgs
   geometry_msgs
   sensor_msgs
 )
@@ -38,7 +40,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
   )
 
   target_link_libraries(motor_driver lgpio)
-  ament_target_dependencies(motor_driver rclcpp std_msgs sensor_msgs)
+  ament_target_dependencies(motor_driver rclcpp truckbot_msgs std_msgs sensor_msgs)
 
   add_executable(encoder_driver
     src/EncoderDriverMiddleware.cpp
@@ -48,6 +50,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
   target_link_libraries(encoder_driver lgpio)
   ament_target_dependencies(encoder_driver
     rclcpp
+    truckbot_msgs
     std_msgs
     geometry_msgs
     nav_msgs

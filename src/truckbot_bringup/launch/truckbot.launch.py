@@ -40,6 +40,7 @@ def generate_launch_description():
     navigation_dir = get_package_share_directory('navigation')
     perception_dir = get_package_share_directory('perception')
     imu_dir = get_package_share_directory('icm20948_driver')
+    health_dir = get_package_share_directory('health')
     rplidar_dir = get_package_share_directory('rplidar_ros')
     bringup_dir = get_package_share_directory('truckbot_bringup')
 
@@ -98,6 +99,11 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(localization_dir, 'launch', 'occupancy_grid.launch.py')
+            )
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(health_dir, 'launch', 'health_monitor.launch.py')
             )
         ),
 

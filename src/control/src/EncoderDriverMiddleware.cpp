@@ -1,5 +1,6 @@
 #include "EncoderDriver.h"
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include <chrono>
 #include "std_msgs/msg/float64.hpp"
 #include "nav_msgs/msg/odometry.hpp"
@@ -12,6 +13,9 @@ class EncoderDriverMiddleware : public rclcpp::Node {
       EncoderDriverMiddleware()
         : Node("encoder_driver_node")
       {
+        heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+        heartbeat_timer_ = this->create_wall_timer(
+            std::chrono::seconds(1), std::bind(&EncoderDriverMiddleware::heartbeat_callback, this));
         // Declare and get parameters from YAML
         wheelSeparation = this->declare_parameter<double>("wheel_separation", 0.2);
         double wheelRadius = this->declare_parameter<double>("wheel_radius", 0.05);
@@ -34,11 +38,18 @@ class EncoderDriverMiddleware : public rclcpp::Node {
         std::string rightRearTopic = this->declare_parameter<std::string>("right_rear_encoder_topic", "/encoder/right_rear");
         int update_rate = this->declare_parameter<int>("update_rate", 10);
 
-        // Create EncoderDriver objects
-        rightFront = std::make_shared<EncoderDriver>(chip, rightFrontA, rightFrontB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
-        rightRear = std::make_shared<EncoderDriver>(chip, rightRearA, rightRearB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
-        leftFront = std::make_shared<EncoderDriver>(chip, leftFrontA, leftFrontB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
-        leftRear = std::make_shared<EncoderDriver>(chip, leftRearA, leftRearB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
+        // On GPIO setup failure, stay alive only to report FAILED
+        try {
+          rightFront = std::make_shared<EncoderDriver>(chip, rightFrontA, rightFrontB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
+          rightRear = std::make_shared<EncoderDriver>(chip, rightRearA, rightRearB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
+          leftFront = std::make_shared<EncoderDriver>(chip, leftFrontA, leftFrontB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
+          leftRear = std::make_shared<EncoderDriver>(chip, leftRearA, leftRearB, wheelRadius, encoderCPR, encoderTicksPerRevolution);
+        } catch (const std::exception& e) {
+          RCLCPP_FATAL(this->get_logger(), "Encoder setup failed: %s", e.what());
+          health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+          health_detail_ = e.what();
+          return;
+        }
 
         // Create publishers and use update_rate for timer period
         left_front_pub_ = this->create_publisher<std_msgs::msg::Float64>(leftFrontTopic, 10);
@@ -52,12 +63,33 @@ class EncoderDriverMiddleware : public rclcpp::Node {
         odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>(encoder_topic, 10);
       }
     private:
+        void heartbeat_callback()
+        {
+          auto heartbeat = truckbot_msgs::msg::Heartbeat();
+          heartbeat.stamp = this->now();
+          heartbeat.node_name = this->get_name();
+          heartbeat.state = health_state_;
+          heartbeat.detail = health_detail_;
+          heartbeat_pub_->publish(heartbeat);
+        }
+
         void timer_callback()
         {
           auto rightFrontWheelSpeed = rightFront->getWheelSpeeds();
           auto rightRearWheelSpeed = rightRear->getWheelSpeeds();
           auto leftFrontWheelSpeed = leftFront->getWheelSpeeds();
           auto leftRearWheelSpeed = leftRear->getWheelSpeeds();
+
+          int readErrors = rightFront->getReadErrors() + rightRear->getReadErrors() +
+                           leftFront->getReadErrors() + leftRear->getReadErrors();
+          if (readErrors > lastReadErrors) {
+            health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+            health_detail_ = "encoder gpio read failed";
+          } else {
+            health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+            health_detail_ = "";
+          }
+          lastReadErrors = readErrors;
 
           // RCLCPP_INFO(this->get_logger(), "LF: %f, LR: %f, RF: %f, RR: %f", leftFrontWheelSpeed, leftRearWheelSpeed, rightFrontWheelSpeed, rightRearWheelSpeed);
 
@@ -89,7 +121,12 @@ class EncoderDriverMiddleware : public rclcpp::Node {
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr right_front_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr right_rear_pub_;
         rclcpp::TimerBase::SharedPtr timer_;
+        rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+        rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+        uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+        std::string health_detail_;
         double wheelSeparation;
+        int lastReadErrors = 0;
 };
 
 int main(int argc, char** argv) {

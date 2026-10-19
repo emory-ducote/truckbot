@@ -13,6 +13,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(truckbot_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(fmt REQUIRED)
 
@@ -30,7 +31,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
   )
 
   target_link_libraries(imu lgpio Eigen3::Eigen fmt::fmt)
-  ament_target_dependencies(imu rclcpp sensor_msgs)
+  ament_target_dependencies(imu rclcpp sensor_msgs truckbot_msgs)
 
   install(TARGETS
     imu

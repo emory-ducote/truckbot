@@ -3,6 +3,7 @@
 #include "AStarPlanner.h"
 #include "VehiclePose.h"
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -13,6 +14,9 @@ class AStarPlannerMiddleware : public rclcpp::Node {
     AStarPlannerMiddleware()
       : Node("a_star_planner_middleware")
     {
+      heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+      heartbeat_timer_ = this->create_wall_timer(
+          std::chrono::seconds(1), std::bind(&AStarPlannerMiddleware::heartbeat_callback, this));
       cost_grid_topic_ = this->declare_parameter<std::string>("cost_grid_topic", "/cost_grid");
       goal_topic_ = this->declare_parameter<std::string>("goal_topic", "/goal_pose");
       pose_topic_ = this->declare_parameter<std::string>("pose_topic", "/heaviest_particle_pose");
@@ -46,6 +50,16 @@ class AStarPlannerMiddleware : public rclcpp::Node {
     }
 
   private:
+    void heartbeat_callback()
+    {
+      auto heartbeat = truckbot_msgs::msg::Heartbeat();
+      heartbeat.stamp = this->now();
+      heartbeat.node_name = this->get_name();
+      heartbeat.state = health_state_;
+      heartbeat.detail = health_detail_;
+      heartbeat_pub_->publish(heartbeat);
+    }
+
     void cost_grid_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
     {
       if (msg->info.width == 0 || msg->info.height == 0) {
@@ -91,7 +105,13 @@ class AStarPlannerMiddleware : public rclcpp::Node {
 
     void replan_timer_callback()
     {
-      if (!goal_received_ || !pose_received_ || !cost_grid_received_) {
+      if (!pose_received_ || !cost_grid_received_) {
+        return;
+      }
+      // Ready and waiting on a goal is normal operation, not INIT
+      if (!goal_received_) {
+        health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+        health_detail_ = "";
         return;
       }
 
@@ -102,10 +122,14 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       if (path.empty()) {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                              "A* found no path.");
+        health_state_ = truckbot_msgs::msg::Heartbeat::DEGRADED;
+        health_detail_ = "no path to goal";
         return;
       }
 
       publish_path(path);
+      health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+      health_detail_ = "";
     }
 
     std::pair<int, int> world_to_cell(double x, double y) const
@@ -153,6 +177,10 @@ class AStarPlannerMiddleware : public rclcpp::Node {
     navigation::VehiclePose current_pose_;
     bool goal_received_ = false;
     bool pose_received_ = false;
+    rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+    rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+    uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+    std::string health_detail_;
     bool cost_grid_received_ = false;
 };
 

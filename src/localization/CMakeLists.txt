@@ -12,6 +12,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(truckbot_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -34,7 +35,7 @@ add_executable(ekf
 )
 
 target_link_libraries(ekf Eigen3::Eigen fmt::fmt)
-ament_target_dependencies(ekf rclcpp sensor_msgs std_msgs nav_msgs geometry_msgs tf2_ros)
+ament_target_dependencies(ekf rclcpp truckbot_msgs sensor_msgs std_msgs nav_msgs geometry_msgs tf2_ros)
 
 add_executable(particle_filter
   src/ParticleFilterMiddleware.cpp
@@ -42,7 +43,7 @@ add_executable(particle_filter
 )
 
 target_link_libraries(particle_filter Eigen3::Eigen fmt::fmt TBB::tbb)
-ament_target_dependencies(particle_filter rclcpp visualization_msgs nav_msgs geometry_msgs tf2_ros tf2 tf2_geometry_msgs)
+ament_target_dependencies(particle_filter rclcpp truckbot_msgs visualization_msgs nav_msgs geometry_msgs tf2_ros tf2 tf2_geometry_msgs)
 
 add_executable(occupancy_grid
   src/OccupancyGridMiddleware.cpp
@@ -50,7 +51,7 @@ add_executable(occupancy_grid
 )
 
 target_link_libraries(occupancy_grid Eigen3::Eigen)
-ament_target_dependencies(occupancy_grid rclcpp sensor_msgs nav_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs)
+ament_target_dependencies(occupancy_grid rclcpp truckbot_msgs sensor_msgs nav_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs)
 
 install(TARGETS
   ekf

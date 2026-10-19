@@ -1,4 +1,5 @@
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -14,6 +15,9 @@ class VoxelizationMiddleware : public rclcpp::Node
 public:
   VoxelizationMiddleware() : Node("voxelization_middleware")
   {
+    heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+    heartbeat_timer_ = this->create_wall_timer(
+        std::chrono::seconds(1), std::bind(&VoxelizationMiddleware::heartbeat_callback, this));
     double voxelSize = this->declare_parameter<double>("voxel_size", 0.05);
     // Create a subscription to /scan topic
     scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 
@@ -66,6 +70,16 @@ void publishClusters(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
 
 
 private:
+  void heartbeat_callback()
+  {
+    auto heartbeat = truckbot_msgs::msg::Heartbeat();
+    heartbeat.stamp = this->now();
+    heartbeat.node_name = this->get_name();
+    heartbeat.state = health_state_;
+    heartbeat.detail = health_detail_;
+    heartbeat_pub_->publish(heartbeat);
+  }
+
   void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
   {
     // Convert LaserScan → PointCloud2
@@ -82,11 +96,17 @@ private:
     auto cloudOut = voxelization->voxelizeCloud(cloudPtr);
 
     publishClusters(cloudOut);
+    health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+    health_detail_ = "";
   }
 
   laser_geometry::LaserProjection projector_;  // LaserScan to PointCloud2
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr cluster_pub_;
+  rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+  rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+  uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+  std::string health_detail_;
   std::shared_ptr<Voxelization> voxelization;
 };
 

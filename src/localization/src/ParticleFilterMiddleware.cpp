@@ -6,6 +6,7 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include <visualization_msgs/msg/marker_array.hpp>
 #include "nav_msgs/msg/odometry.hpp"
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -21,6 +22,9 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     ParticleFilterMiddleware()
       : Node("particle_filter_middleware")
     {
+      heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+      heartbeat_timer_ = this->create_wall_timer(
+          std::chrono::seconds(1), std::bind(&ParticleFilterMiddleware::heartbeat_callback, this));
       int numParticles = this->declare_parameter<int>("num_particles", 100);
       int newParticleIncrease = this->declare_parameter<int>("new_particle_increase", 1);
       double maxRange = this->declare_parameter<double>("max_range", 5.0);
@@ -77,12 +81,23 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     double prev_time = 0;
 
   private:
+    void heartbeat_callback()
+    {
+      auto heartbeat = truckbot_msgs::msg::Heartbeat();
+      heartbeat.stamp = this->now();
+      heartbeat.node_name = this->get_name();
+      heartbeat.state = health_state_;
+      heartbeat.detail = health_detail_;
+      heartbeat_pub_->publish(heartbeat);
+    }
+
     // The particle pose is an estimate of map->base_link. REP-105 requires the
     // localizer to publish map->odom (the drift correction), and the odom source
     // (EKF) publishes odom->base_link. Broadcasting the full pose as map->odom
     // would double-count odometry once TF composes the chain, so we publish the
     // correction: T_map_odom = T_map_base * T_odom_base^-1.
-    void publishMapToOdom(const Particle& best, const rclcpp::Time& stamp)
+    // Returns false if odom->base_link was unavailable and nothing was published
+    bool publishMapToOdom(const Particle& best, const rclcpp::Time& stamp)
     {
       // T_map_base from the best particle.
       tf2::Transform T_mb;
@@ -99,7 +114,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       } catch (const tf2::TransformException& e) {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                              "map->odom skipped, odom->base_link unavailable: %s", e.what());
-        return;
+        return false;
       }
       tf2::Transform T_ob;
       tf2::fromMsg(ob_msg.transform, T_ob);
@@ -113,6 +128,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       tf_msg.child_frame_id = "odom";
       tf_msg.transform = tf2::toMsg(T_mo);
       tf_broadcaster_->sendTransform(tf_msg);
+      return true;
     }
     void clusterCallback(const visualization_msgs::msg::MarkerArray::SharedPtr msg)
     {
@@ -169,7 +185,19 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       if (!result.empty()) {
         {
           Particle heaviest = particleFilter->getBestParticle();
-          publishMapToOdom(heaviest, meas_stamp);
+          if (publishMapToOdom(heaviest, meas_stamp)) {
+            last_map_to_odom_ = std::chrono::steady_clock::now();
+          }
+          if (!heaviest.x.allFinite()) {
+            health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+            health_detail_ = "best particle pose is not finite";
+          } else if (std::chrono::steady_clock::now() - last_map_to_odom_ > std::chrono::seconds(2)) {
+            health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+            health_detail_ = "odom->base_link tf unavailable";
+          } else {
+            health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+            health_detail_ = "";
+          }
 
           // Publish pose estimate
           geometry_msgs::msg::PoseStamped pose_msg;
@@ -233,7 +261,12 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr control_sub_;
     std::shared_ptr<ParticleFilter> particleFilter;
     std::vector<Particle> result;
+    rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+    rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+    uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+    std::string health_detail_;
     Vector2d u_t;
+    std::chrono::steady_clock::time_point last_map_to_odom_ = std::chrono::steady_clock::now();
 };
 
 int main(int argc, char** argv) {

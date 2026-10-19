@@ -2,6 +2,7 @@
 #include <memory>
 #include <cmath>
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/twist.hpp"
@@ -12,6 +13,9 @@ class PurePursuitControllerMiddleware : public rclcpp::Node {
 public:
 	PurePursuitControllerMiddleware() : Node("pure_pursuit_controller_middleware")
 	{
+		heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+		heartbeat_timer_ = this->create_wall_timer(
+				std::chrono::seconds(1), std::bind(&PurePursuitControllerMiddleware::heartbeat_callback, this));
 		double lookahead_distance = this->declare_parameter<double>("lookahead_distance", 1.0);
 		linear_velocity_ = this->declare_parameter<double>("linear_velocity", 0.15);
 		goal_tolerance_ = this->declare_parameter<double>("goal_tolerance", 0.1);
@@ -31,6 +35,16 @@ public:
 	}
 
 private:
+	void heartbeat_callback()
+	{
+		auto heartbeat = truckbot_msgs::msg::Heartbeat();
+		heartbeat.stamp = this->now();
+		heartbeat.node_name = this->get_name();
+		heartbeat.state = health_state_;
+		heartbeat.detail = health_detail_;
+		heartbeat_pub_->publish(heartbeat);
+	}
+
 	void odomCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
       auto& q = msg->pose.orientation;
@@ -64,6 +78,11 @@ private:
 	{
 		if (!pose_received_ || purePursuitController->getLocalPath().empty()) {
 			RCLCPP_INFO(this->get_logger(), "Waiting for pose and path initialization");
+			// Having a pose but no path just means no goal yet
+			if (pose_received_) {
+				health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+				health_detail_ = "";
+			}
 			return;
 		}
 		
@@ -107,8 +126,12 @@ private:
 			local_lookahead_msg.point.y = localLookahead.y;
 			local_lookahead_msg.point.z = 0.0;
 			local_lookahead_pub_->publish(local_lookahead_msg);
+			health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+			health_detail_ = "";
 		} catch (const std::exception& e) {
 			RCLCPP_WARN(this->get_logger(), "PurePursuit control skipped: %s", e.what());
+			health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+			health_detail_ = e.what();
 		}
 	}
 
@@ -124,6 +147,10 @@ private:
 	bool pose_received_ = false;
 	bool mission_done = false;
 	bool have_goal_ = false;
+	rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+	rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+	uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+	std::string health_detail_;
 	navigation::VehiclePose final_goal_;
 };
 

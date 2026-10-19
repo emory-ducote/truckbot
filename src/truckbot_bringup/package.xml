@@ -14,6 +14,7 @@
   <exec_depend>navigation</exec_depend>
   <exec_depend>perception</exec_depend>
   <exec_depend>icm20948_driver</exec_depend>
+  <exec_depend>health</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
 
