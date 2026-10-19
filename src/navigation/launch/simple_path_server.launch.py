@@ -15,7 +15,7 @@ def generate_launch_description():
         Node(
             package='navigation',
             executable='simple_path_server',
-            name='simple_path_server_middleware',
+            name='simple_path_server',
             parameters=[simple_path_config]
         )
     ])

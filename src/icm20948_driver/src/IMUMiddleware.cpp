@@ -10,7 +10,7 @@ using namespace std::chrono_literals;
 
 class IMUPublisher : public rclcpp::Node {
     public:
-    IMUPublisher() : Node("imu_middleware")
+    IMUPublisher() : Node("imu")
         {
             int deviceId = this->declare_parameter<int>("i2c_device", 0x68);
 
@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
     try {
         node = std::make_shared<IMUPublisher>();
     } catch (const std::exception& e) {
-        RCLCPP_FATAL(rclcpp::get_logger("imu_middleware"), "Failed to initialize IMU: %s", e.what());
+        RCLCPP_FATAL(rclcpp::get_logger("imu"), "Failed to initialize IMU: %s", e.what());
         rclcpp::shutdown();
         return 1;
     }

@@ -13,7 +13,7 @@ class OccupancyGridMiddleware : public rclcpp::Node {
 
   public:
     OccupancyGridMiddleware()
-      : Node("occupancy_grid_middleware")
+      : Node("occupancy_grid")
     {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(

@@ -9,7 +9,7 @@
 class SimplePathServerMiddleware : public rclcpp::Node {
 public:
   SimplePathServerMiddleware()
-  : Node("simple_path_server_middleware")
+  : Node("simple_path_server")
   {
     heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
     heartbeat_timer_ = this->create_wall_timer(

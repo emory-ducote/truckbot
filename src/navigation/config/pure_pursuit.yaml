@@ -1,4 +1,4 @@
-pure_pursuit_controller_middleware:
+pure_pursuit_controller:
   ros__parameters:
     lookahead_distance: 0.25
     linear_velocity: 0.2

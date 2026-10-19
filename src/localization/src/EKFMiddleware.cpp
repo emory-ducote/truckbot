@@ -12,7 +12,7 @@
 
 class EKFMiddleware : public rclcpp::Node {
   public:
-      EKFMiddleware(std::shared_ptr<EKF> state) : Node("imu_listener"), state(state)
+      EKFMiddleware(std::shared_ptr<EKF> state) : Node("ekf"), state(state)
       {
             heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
             heartbeat_timer_ = this->create_wall_timer(

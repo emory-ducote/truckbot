@@ -11,7 +11,7 @@ using namespace std::chrono_literals;
 class EncoderDriverMiddleware : public rclcpp::Node {
     public:
       EncoderDriverMiddleware()
-        : Node("encoder_driver_node")
+        : Node("encoder_driver")
       {
         heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
         heartbeat_timer_ = this->create_wall_timer(

@@ -11,7 +11,7 @@
 
 class PathTrackerMiddleware : public rclcpp::Node {
   public:
-    PathTrackerMiddleware(std::shared_ptr<PathTracker> pathTracker) : Node("path_tracker_middleware"), pathTracker(pathTracker)
+    PathTrackerMiddleware(std::shared_ptr<PathTracker> pathTracker) : Node("path_tracker"), pathTracker(pathTracker)
     {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(

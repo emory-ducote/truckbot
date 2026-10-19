@@ -15,7 +15,7 @@ def generate_launch_description():
         Node(
             package='navigation',
             executable='a_star_planner',
-            name='a_star_planner_middleware',
+            name='a_star_planner',
             parameters=[a_star_planner_config]
         )
     ])

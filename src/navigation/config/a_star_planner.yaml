@@ -1,4 +1,4 @@
-a_star_planner_middleware:
+a_star_planner:
   ros__parameters:
     cost_grid_topic: "/cost_grid"
     goal_topic: "/goal_pose"
