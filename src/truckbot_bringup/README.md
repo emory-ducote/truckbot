@@ -27,6 +27,7 @@ map
 - navigation
 - perception
 - icm20948_driver
+- health
 
 ## Building
 

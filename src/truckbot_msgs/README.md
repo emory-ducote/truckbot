@@ -22,6 +22,15 @@ Health heartbeat published by each module at 1 Hz on `/health/heartbeat`.
 | `DEGRADED` | 2 | Node is running but could not do its job (e.g. no path to goal) |
 | `FAILED` | 3 | Node has hit an error |
 
+### `SystemHealth`
+Aggregated health published by the health monitor on `/health/system`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `stamp` | `builtin_interfaces/Time` | Time the monitor evaluated health |
+| `state` | `uint8` | Worst state across all modules, using the `Heartbeat` constants |
+| `modules` | `Heartbeat[]` | Effective state of each module, including timeouts applied by the monitor |
+
 ## Dependencies
 - ROS2
 - ament_cmake
