@@ -10,7 +10,7 @@
 
 class SplineGeneratorMiddleware : public rclcpp::Node {
   public:
-    SplineGeneratorMiddleware() : Node("spline_generator_middleware")
+    SplineGeneratorMiddleware() : Node("spline_generator")
     {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(

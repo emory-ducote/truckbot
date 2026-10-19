@@ -14,7 +14,7 @@ class FeatureDetectionMiddleware : public rclcpp::Node
 {
 public:
   FeatureDetectionMiddleware(std::shared_ptr<FeatureDetection> featureDetection)
-  : Node("feature_detection_middleware"), featureDetection(featureDetection)
+  : Node("feature_detector"), featureDetection(featureDetection)
   {
     heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
     heartbeat_timer_ = this->create_wall_timer(

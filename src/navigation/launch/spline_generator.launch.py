@@ -15,7 +15,7 @@ def generate_launch_description():
         Node(
             package='navigation',
             executable='spline_generator',
-            name='spline_generator_middleware',
+            name='spline_generator',
             parameters=[spline_config]
         )
     ])

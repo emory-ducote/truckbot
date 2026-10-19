@@ -15,7 +15,7 @@
 
 class MotorDriverMiddleware : public rclcpp::Node {
   public:
-      MotorDriverMiddleware() : Node("motor_driver_node")
+      MotorDriverMiddleware() : Node("motor_driver")
       {
           heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
           heartbeat_timer_ = this->create_wall_timer(

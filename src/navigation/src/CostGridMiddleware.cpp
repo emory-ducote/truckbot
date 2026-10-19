@@ -8,7 +8,7 @@ class CostGridMiddleware : public rclcpp::Node {
 
   public:
     CostGridMiddleware()
-      : Node("cost_grid_middleware")
+      : Node("cost_grid")
     {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(

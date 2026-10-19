@@ -14,7 +14,7 @@ def generate_launch_description():
         Node(
             package='perception',
             executable='corner_detector',
-            name='corner_detector_middleware',
+            name='corner_detector',
             output='screen',
             parameters=[corner_detector_config]
         )

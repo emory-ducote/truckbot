@@ -7,7 +7,7 @@
 class CornerDetectorMiddleware : public rclcpp::Node
 {
 public:
-    CornerDetectorMiddleware() : Node("corner_detector_middleware")
+    CornerDetectorMiddleware() : Node("corner_detector")
     {
         heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
         heartbeat_timer_ = this->create_wall_timer(

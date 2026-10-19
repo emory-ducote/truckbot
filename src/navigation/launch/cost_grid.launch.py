@@ -15,7 +15,7 @@ def generate_launch_description():
         Node(
             package='navigation',
             executable='cost_grid',
-            name='cost_grid_middleware',
+            name='cost_grid',
             parameters=[cost_grid_config]
         )
     ])

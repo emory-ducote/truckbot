@@ -12,7 +12,7 @@ class AStarPlannerMiddleware : public rclcpp::Node {
 
   public:
     AStarPlannerMiddleware()
-      : Node("a_star_planner_middleware")
+      : Node("a_star_planner")
     {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(

@@ -14,7 +14,7 @@ def generate_launch_description():
         Node(
             package='navigation',
             executable='pure_pursuit_controller',
-            name='pure_pursuit_controller_middleware',
+            name='pure_pursuit_controller',
             parameters=[pure_pursuit_config]
         )
     ])

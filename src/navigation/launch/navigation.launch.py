@@ -17,31 +17,31 @@ def generate_launch_description():
         Node(
             package='navigation',
             executable='spline_generator',
-            name='spline_generator_middleware',
+            name='spline_generator',
             parameters=[spline_generator_config]
         ),
         Node(
             package='navigation',
             executable='a_star_planner',
-            name='a_star_planner_middleware',
+            name='a_star_planner',
             parameters=[a_star_planner_config]
         ),
         Node(
             package='navigation',
             executable='path_tracker',
-            name='path_tracker_middleware',
+            name='path_tracker',
             parameters=[path_tracker_config]
         ),
         Node(
             package='navigation',
             executable='pure_pursuit_controller',
-            name='pure_pursuit_controller_middleware',
+            name='pure_pursuit_controller',
             parameters=[pure_pursuit_config]
         ),
         Node(
             package='navigation',
             executable='cost_grid',
-            name='cost_grid_middleware',
+            name='cost_grid',
             parameters=[cost_grid_config]
         )
     ])

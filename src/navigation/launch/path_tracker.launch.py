@@ -14,7 +14,7 @@ def generate_launch_description():
         Node(
             package='navigation',
             executable='path_tracker',
-            name='path_tracker_middleware',
+            name='path_tracker',
             parameters=[path_tracker_config]
         )
     ])

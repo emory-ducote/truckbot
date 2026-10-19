@@ -11,7 +11,7 @@
 
 class PurePursuitControllerMiddleware : public rclcpp::Node {
 public:
-	PurePursuitControllerMiddleware() : Node("pure_pursuit_controller_middleware")
+	PurePursuitControllerMiddleware() : Node("pure_pursuit_controller")
 	{
 		heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
 		heartbeat_timer_ = this->create_wall_timer(

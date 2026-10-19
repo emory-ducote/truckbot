@@ -20,7 +20,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
     
   public:
     ParticleFilterMiddleware()
-      : Node("particle_filter_middleware")
+      : Node("particle_filter")
     {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(

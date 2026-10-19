@@ -7,7 +7,7 @@
 
 class JoyListener : public rclcpp::Node {
   public:
-      JoyListener() : Node("joy_listener")
+      JoyListener() : Node("teleop")
       {
         heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
         heartbeat_timer_ = this->create_wall_timer(
