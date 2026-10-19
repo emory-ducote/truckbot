@@ -21,9 +21,11 @@ class MotorDriver {
         double getMeasuredSpeed() const { return measuredSpeed.load(); }
         void setTargetSpeed(double v) { targetSpeed.store(v); }
         double getTargetSpeed() const { return targetSpeed.load(); }
-        void updateMotorSpeed(const bool usePID);
+        // Returns false if writing the PWM to either pin failed
+        bool updateMotorSpeed(const bool usePID);
     private:
         double speedToPWM(const double speed);
+        void checkGpio(int result, const char* action, uint8_t pin);
         const uint8_t chip;
         const uint8_t pinOne;
         const uint8_t pinTwo;

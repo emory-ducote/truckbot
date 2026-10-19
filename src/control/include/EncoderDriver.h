@@ -18,8 +18,10 @@ class EncoderDriver {
         ~EncoderDriver();
         void handleEdgeChange();
         double getWheelSpeeds();  
+        int getReadErrors() const { return readErrors.load(); }
         
     private:
+        void checkGpio(int result, const char* action, uint8_t pin);
         const uint8_t chip;
         const uint8_t pinA;
         const uint8_t pinB;
@@ -27,6 +29,7 @@ class EncoderDriver {
         const int encoderCPR;
         const int encoderTicksPerRevolution;
         std::atomic<int> encoderTicks;
+        std::atomic<int> readErrors;
         int lastEncoderTicks;
         int lastEncoderRead;
         double previousCalculationStamp;

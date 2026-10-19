@@ -1,5 +1,6 @@
 #include <cmath>
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "nav_msgs/msg/odometry.hpp"
@@ -13,6 +14,9 @@ class EKFMiddleware : public rclcpp::Node {
   public:
       EKFMiddleware(std::shared_ptr<EKF> state) : Node("imu_listener"), state(state)
       {
+            heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+            heartbeat_timer_ = this->create_wall_timer(
+                std::chrono::seconds(1), std::bind(&EKFMiddleware::heartbeat_callback, this));
             odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
               "/odom", 10, std::bind(&EKFMiddleware::odomCallback, this, std::placeholders::_1));
             imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
@@ -24,6 +28,16 @@ class EKFMiddleware : public rclcpp::Node {
           }
 
     private:
+        void heartbeat_callback()
+        {
+          auto heartbeat = truckbot_msgs::msg::Heartbeat();
+          heartbeat.stamp = this->now();
+          heartbeat.node_name = this->get_name();
+          heartbeat.state = health_state_;
+          heartbeat.detail = health_detail_;
+          heartbeat_pub_->publish(heartbeat);
+        }
+
         void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
         {
           latest_w_imu_ = msg->angular_velocity.z;
@@ -39,6 +53,13 @@ class EKFMiddleware : public rclcpp::Node {
           double dt = curTime - prevTime;
           prevTime = curTime;
           state->ekf_loop(state->x, v_t, w_t, dt);
+          if (!state->x.allFinite()) {
+            health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+            health_detail_ = "ekf state is not finite";
+          } else {
+            health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+            health_detail_ = "";
+          }
 
           double yaw = state->x[2];
 
@@ -64,6 +85,10 @@ class EKFMiddleware : public rclcpp::Node {
         std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
         std::shared_ptr<EKF> state;
         double prevTime;
+        rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+        rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+        uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+        std::string health_detail_;
         double latest_w_imu_ = 0.0;
 };
 

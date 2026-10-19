@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cmath>
+#include <stdexcept>
+#include <string>
 #include "EncoderDriver.h"
 
 void encoderCallback(int /*e*/, lgGpioAlert_p /*evt*/, void *data)
@@ -21,6 +23,7 @@ EncoderDriver::EncoderDriver(const uint8_t& chip,
       encoderCPR(encoderCPR),
       encoderTicksPerRevolution(encoderTicksPerRevolution),
       encoderTicks(0),
+      readErrors(0),
       lastEncoderTicks(0),
       lastEncoderRead(0),
       lastDtPrintStamp(0.0)
@@ -31,18 +34,28 @@ EncoderDriver::EncoderDriver(const uint8_t& chip,
 
     handle = lgGpiochipOpen(chip);
     if (handle < 0) {
-        fprintf(stderr, "Error opening GPIO chip %d\n", chip);
+        throw std::runtime_error("Error opening GPIO chip " + std::to_string(chip) +
+                                 " for encoder (lgpio error " + std::to_string(handle) + ")");
     }
 
-    lgGpioClaimInput(handle, LG_SET_PULL_NONE, pinA);
-    lgGpioClaimInput(handle, LG_SET_PULL_NONE, pinB);
+    checkGpio(lgGpioClaimInput(handle, LG_SET_PULL_NONE, pinA), "claim input", pinA);
+    checkGpio(lgGpioClaimInput(handle, LG_SET_PULL_NONE, pinB), "claim input", pinB);
 
     // Register callbacks
-    lgGpioSetAlertsFunc(handle, pinA, encoderCallback, this);
-    lgGpioSetAlertsFunc(handle, pinB, encoderCallback, this);
+    checkGpio(lgGpioSetAlertsFunc(handle, pinA, encoderCallback, this), "set alert callback", pinA);
+    checkGpio(lgGpioSetAlertsFunc(handle, pinB, encoderCallback, this), "set alert callback", pinB);
 
-    lgGpioClaimAlert(handle, 0, LG_BOTH_EDGES, pinA, -1);
-    lgGpioClaimAlert(handle, 0, LG_BOTH_EDGES, pinB, -1);
+    checkGpio(lgGpioClaimAlert(handle, 0, LG_BOTH_EDGES, pinA, -1), "claim alert", pinA);
+    checkGpio(lgGpioClaimAlert(handle, 0, LG_BOTH_EDGES, pinB, -1), "claim alert", pinB);
+}
+
+void EncoderDriver::checkGpio(int result, const char* action, uint8_t pin)
+{
+    if (result < 0) {
+        lgGpiochipClose(handle);
+        throw std::runtime_error("Encoder GPIO " + std::string(action) + " failed on pin " +
+                                 std::to_string(pin) + " (lgpio error " + std::to_string(result) + ")");
+    }
 }
 
 EncoderDriver::~EncoderDriver()
@@ -53,6 +66,10 @@ void EncoderDriver::handleEdgeChange()
 {
     int MSB = lgGpioRead(handle, pinA);
     int LSB = lgGpioRead(handle, pinB);
+    if (MSB < 0 || LSB < 0) {
+        readErrors++;
+        return;
+    }
 
     int currentEncoderRead = (MSB << 1) | LSB;
     int encoderEdgeChange = (lastEncoderRead << 2) | currentEncoderRead;

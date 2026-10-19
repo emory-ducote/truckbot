@@ -1,5 +1,6 @@
 #include "CostGrid.h"
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "std_msgs/msg/header.hpp"
 
@@ -9,6 +10,9 @@ class CostGridMiddleware : public rclcpp::Node {
     CostGridMiddleware()
       : Node("cost_grid_middleware")
     {
+      heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+      heartbeat_timer_ = this->create_wall_timer(
+          std::chrono::seconds(1), std::bind(&CostGridMiddleware::heartbeat_callback, this));
       double collisionRadius = this->declare_parameter<double>("collision_radius", 0.23);
       double clearanceRadius = this->declare_parameter<double>("clearance_radius", 0.45);
       int occupiedThreshold = this->declare_parameter<int>("occupied_threshold", 65);
@@ -30,6 +34,16 @@ class CostGridMiddleware : public rclcpp::Node {
     }
 
   private:
+    void heartbeat_callback()
+    {
+      auto heartbeat = truckbot_msgs::msg::Heartbeat();
+      heartbeat.stamp = this->now();
+      heartbeat.node_name = this->get_name();
+      heartbeat.state = health_state_;
+      heartbeat.detail = health_detail_;
+      heartbeat_pub_->publish(heartbeat);
+    }
+
     void occupancy_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
     {
       if (msg->info.width == 0 || msg->info.height == 0) {
@@ -48,6 +62,8 @@ class CostGridMiddleware : public rclcpp::Node {
       cost_grid_->computeCosts();
 
       publish_cost_grid(msg->header);
+      health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+      health_detail_ = "";
     }
 
     void publish_cost_grid(const std_msgs::msg::Header& source_header)
@@ -70,6 +86,10 @@ class CostGridMiddleware : public rclcpp::Node {
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr cost_grid_pub_;
     std::shared_ptr<CostGrid> cost_grid_;
     std::string occupancy_topic_;
+    rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+    rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+    uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+    std::string health_detail_;
     std::string cost_grid_topic_;
 };
 

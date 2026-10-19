@@ -1,4 +1,5 @@
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include <visualization_msgs/msg/marker_array.hpp>
 #include "CornerDetector.h"
@@ -8,6 +9,9 @@ class CornerDetectorMiddleware : public rclcpp::Node
 public:
     CornerDetectorMiddleware() : Node("corner_detector_middleware")
     {
+        heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+        heartbeat_timer_ = this->create_wall_timer(
+                std::chrono::seconds(1), std::bind(&CornerDetectorMiddleware::heartbeat_callback, this));
         double mapResolution     = declare_parameter<double>("map_resolution",      0.05);
         double mapRange          = declare_parameter<double>("map_range",           6.0);
         int    maxCorners        = declare_parameter<int>   ("max_corners",         100);
@@ -40,9 +44,27 @@ public:
     }
 
 private:
+    void heartbeat_callback()
+    {
+        auto heartbeat = truckbot_msgs::msg::Heartbeat();
+        heartbeat.stamp = this->now();
+        heartbeat.node_name = this->get_name();
+        heartbeat.state = health_state_;
+        heartbeat.detail = health_detail_;
+        heartbeat_pub_->publish(heartbeat);
+    }
+
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        auto corners = cornerDetector->extractCorners(*msg);
+        std::vector<Eigen::Vector2d> corners;
+        try {
+            corners = cornerDetector->extractCorners(*msg);
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Corner extraction failed: %s", e.what());
+            health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+            health_detail_ = e.what();
+            return;
+        }
 
         visualization_msgs::msg::MarkerArray marker_array;
         int id = 0;
@@ -71,10 +93,16 @@ private:
 
         RCLCPP_DEBUG(get_logger(), "Publishing %zu corners", corners.size());
         corner_pub_->publish(marker_array);
+        health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+        health_detail_ = "";
     }
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr corner_pub_;
+    rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+    rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+    uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+    std::string health_detail_;
     std::shared_ptr<CornerDetector> cornerDetector;
 };
 

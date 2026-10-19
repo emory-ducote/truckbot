@@ -1,6 +1,7 @@
 
 #include <chrono>
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "std_msgs/msg/int64.hpp"
@@ -12,6 +13,9 @@ class PathTrackerMiddleware : public rclcpp::Node {
   public:
     PathTrackerMiddleware(std::shared_ptr<PathTracker> pathTracker) : Node("path_tracker_middleware"), pathTracker(pathTracker)
     {
+      heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+      heartbeat_timer_ = this->create_wall_timer(
+          std::chrono::seconds(1), std::bind(&PathTrackerMiddleware::heartbeat_callback, this));
       odom_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
                 "/heaviest_particle_pose", 10, std::bind(&PathTrackerMiddleware::odomCallback, this, std::placeholders::_1));
       path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
@@ -24,6 +28,16 @@ class PathTrackerMiddleware : public rclcpp::Node {
     }
 
   private:
+    void heartbeat_callback()
+    {
+      auto heartbeat = truckbot_msgs::msg::Heartbeat();
+      heartbeat.stamp = this->now();
+      heartbeat.node_name = this->get_name();
+      heartbeat.state = health_state_;
+      heartbeat.detail = health_detail_;
+      heartbeat_pub_->publish(heartbeat);
+    }
+
     void odomCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
     {
       auto& q = msg->pose.orientation;
@@ -33,6 +47,7 @@ class PathTrackerMiddleware : public rclcpp::Node {
                                       msg->pose.position.y,
                                       yaw);
       pathTracker->setVehiclePose(newPose);
+      pose_received_ = true;
     }
     void pathCallback(const nav_msgs::msg::Path::SharedPtr msg)
     {
@@ -49,6 +64,16 @@ class PathTrackerMiddleware : public rclcpp::Node {
     void timerCallback()
     {
       int closestIndex = pathTracker->findNearestPose();
+      if (pose_received_) {
+        // A path with no nearest index means the pose or path contains NaNs
+        if (!pathTracker->getGlobalPath().empty() && closestIndex < 0) {
+          health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+          health_detail_ = "no nearest path index found";
+        } else {
+          health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+          health_detail_ = "";
+        }
+      }
       RCLCPP_INFO(this->get_logger(), "Nearest Path Index: %d", closestIndex);
       auto closestIndexMessage = std_msgs::msg::Int64();
       closestIndexMessage.data = closestIndex;  
@@ -72,7 +97,12 @@ class PathTrackerMiddleware : public rclcpp::Node {
     rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr global_path_index_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_path_point_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+    rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+    uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+    std::string health_detail_;
     std::shared_ptr<PathTracker> pathTracker;
+    bool pose_received_ = false;
 };
 
 int main(int argc, char * argv[])

@@ -19,7 +19,8 @@ Health heartbeat published by each module at 1 Hz on `/health/heartbeat`.
 |-------|-------|---------|
 | `INIT` | 0 | Node is starting up |
 | `GOOD` | 1 | Node is operating normally |
-| `FAILED` | 2 | Node has hit an error |
+| `DEGRADED` | 2 | Node is running but could not do its job (e.g. no path to goal) |
+| `FAILED` | 3 | Node has hit an error |
 
 ## Dependencies
 - ROS2

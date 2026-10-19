@@ -1,5 +1,6 @@
 #include "OccupancyGrid.h"
 #include "rclcpp/rclcpp.hpp"
+#include "truckbot_msgs/msg/heartbeat.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -14,6 +15,9 @@ class OccupancyGridMiddleware : public rclcpp::Node {
     OccupancyGridMiddleware()
       : Node("occupancy_grid_middleware")
     {
+      heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
+      heartbeat_timer_ = this->create_wall_timer(
+          std::chrono::seconds(1), std::bind(&OccupancyGridMiddleware::heartbeat_callback, this));
       double resolution = this->declare_parameter<double>("resolution", 0.05);
       int width = this->declare_parameter<int>("width", 200);
       int height = this->declare_parameter<int>("height", 200);
@@ -51,6 +55,16 @@ class OccupancyGridMiddleware : public rclcpp::Node {
     }
 
   private:
+    void heartbeat_callback()
+    {
+      auto heartbeat = truckbot_msgs::msg::Heartbeat();
+      heartbeat.stamp = this->now();
+      heartbeat.node_name = this->get_name();
+      heartbeat.state = health_state_;
+      heartbeat.detail = health_detail_;
+      heartbeat_pub_->publish(heartbeat);
+    }
+
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
       // Look up the sensor pose in the map frame at the scan time, then fold
@@ -64,6 +78,12 @@ class OccupancyGridMiddleware : public rclcpp::Node {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
                              "scan dropped, %s->%s unavailable: %s",
                              map_frame_.c_str(), msg->header.frame_id.c_str(), e.what());
+        // TF is expected to be missing at startup, so only fail once we've had it
+        if (health_state_ != truckbot_msgs::msg::Heartbeat::INIT &&
+            std::chrono::steady_clock::now() - last_scan_integrated_ > std::chrono::seconds(2)) {
+          health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+          health_detail_ = "map->laser tf unavailable, dropping scans";
+        }
         return;
       }
 
@@ -74,6 +94,9 @@ class OccupancyGridMiddleware : public rclcpp::Node {
 
       grid_->integrateScan(sensor_pose, msg->ranges,
                            msg->angle_min, msg->angle_increment);
+      last_scan_integrated_ = std::chrono::steady_clock::now();
+      health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+      health_detail_ = "";
     }
 
     void publish_map()
@@ -98,7 +121,12 @@ class OccupancyGridMiddleware : public rclcpp::Node {
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     std::shared_ptr<OccupancyGrid> grid_;
+    rclcpp::TimerBase::SharedPtr heartbeat_timer_;
+    rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
+    uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
+    std::string health_detail_;
     std::string map_frame_;
+    std::chrono::steady_clock::time_point last_scan_integrated_;
 };
 
 int main(int argc, char** argv) {
