@@ -9,7 +9,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import (ExecuteProcess, IncludeLaunchDescription,
                             OpaqueFunction, RegisterEventHandler)
-from launch.event_handlers import OnProcessExit
+from launch.event_handlers import OnProcessExit, OnProcessStart
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
@@ -56,7 +56,15 @@ def generate_launch_description():
         output='screen'
     )
 
-    return LaunchDescription([
+    # Started before everything else so it is listening when the other nodes come up
+    health_monitor = Node(
+        package='health',
+        executable='health_monitor',
+        name='health_monitor',
+        parameters=[os.path.join(health_dir, 'config', 'health_monitor.yaml')]
+    )
+
+    subsystems = [
 
         # --- Static transforms (robot geometry) ---
         Node(
@@ -104,17 +112,20 @@ def generate_launch_description():
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(health_dir, 'launch', 'health_monitor.launch.py')
-            )
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
                 os.path.join(dashboard_dir, 'launch', 'dashboard.launch.py')
             )
         ),
+    ]
 
-        # --- Data recording ---
+    return LaunchDescription([
+
+        # --- Health monitor and data recording first ---
+        health_monitor,
         bag_record,
+        RegisterEventHandler(OnProcessStart(
+            target_action=health_monitor,
+            on_start=subsystems,
+        )),
         RegisterEventHandler(OnProcessExit(
             target_action=bag_record,
             on_exit=[generate_bag_report(bag_dir, report_script)],
