@@ -18,6 +18,7 @@ class OccupancyGridMiddleware : public rclcpp::Node {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(
           std::chrono::seconds(1), std::bind(&OccupancyGridMiddleware::heartbeat_callback, this));
+      heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
       double resolution = this->declare_parameter<double>("resolution", 0.05);
       int width = this->declare_parameter<int>("width", 200);
       int height = this->declare_parameter<int>("height", 200);

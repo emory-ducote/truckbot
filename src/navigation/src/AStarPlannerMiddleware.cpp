@@ -17,6 +17,7 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(
           std::chrono::seconds(1), std::bind(&AStarPlannerMiddleware::heartbeat_callback, this));
+      heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
       cost_grid_topic_ = this->declare_parameter<std::string>("cost_grid_topic", "/cost_grid");
       goal_topic_ = this->declare_parameter<std::string>("goal_topic", "/goal_pose");
       pose_topic_ = this->declare_parameter<std::string>("pose_topic", "/heaviest_particle_pose");

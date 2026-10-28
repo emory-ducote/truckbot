@@ -25,6 +25,7 @@ class ParticleFilterMiddleware : public rclcpp::Node {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(
           std::chrono::seconds(1), std::bind(&ParticleFilterMiddleware::heartbeat_callback, this));
+      heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
       int numParticles = this->declare_parameter<int>("num_particles", 100);
       int newParticleIncrease = this->declare_parameter<int>("new_particle_increase", 1);
       double maxRange = this->declare_parameter<double>("max_range", 5.0);

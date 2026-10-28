@@ -20,6 +20,7 @@ class IMUPublisher : public rclcpp::Node {
             heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
             heartbeat_timer_ = this->create_wall_timer(
                 1s, std::bind(&IMUPublisher::heartbeat_callback, this));
+            heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
 	    imu = std::make_shared<rpi5ICM20948>(deviceId);
         }
 
