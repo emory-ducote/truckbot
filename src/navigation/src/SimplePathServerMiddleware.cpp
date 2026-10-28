@@ -14,6 +14,7 @@ public:
     heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
     heartbeat_timer_ = this->create_wall_timer(
         std::chrono::seconds(1), std::bind(&SimplePathServerMiddleware::heartbeat_callback, this));
+    heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
     path_frame_ = this->declare_parameter<std::string>("path_frame", "map");
     path_topic_ = this->declare_parameter<std::string>("path_topic", "/global_path");
     publish_rate_ = this->declare_parameter<double>("publish_rate", 5.0);

@@ -13,6 +13,7 @@ class CostGridMiddleware : public rclcpp::Node {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(
           std::chrono::seconds(1), std::bind(&CostGridMiddleware::heartbeat_callback, this));
+      heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
       double collisionRadius = this->declare_parameter<double>("collision_radius", 0.23);
       double clearanceRadius = this->declare_parameter<double>("clearance_radius", 0.45);
       int occupiedThreshold = this->declare_parameter<int>("occupied_threshold", 65);

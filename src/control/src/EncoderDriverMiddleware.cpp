@@ -16,6 +16,7 @@ class EncoderDriverMiddleware : public rclcpp::Node {
         heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
         heartbeat_timer_ = this->create_wall_timer(
             std::chrono::seconds(1), std::bind(&EncoderDriverMiddleware::heartbeat_callback, this));
+        heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
         // Declare and get parameters from YAML
         wheelSeparation = this->declare_parameter<double>("wheel_separation", 0.2);
         double wheelRadius = this->declare_parameter<double>("wheel_radius", 0.05);

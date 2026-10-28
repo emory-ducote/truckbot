@@ -12,6 +12,7 @@ class JoyListener : public rclcpp::Node {
         heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
         heartbeat_timer_ = this->create_wall_timer(
             std::chrono::seconds(1), std::bind(&JoyListener::heartbeat_callback, this));
+        heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
         joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
             "/joy", 10, std::bind(&JoyListener::joyCallback, this, std::placeholders::_1));
         cmd_vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);

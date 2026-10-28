@@ -19,6 +19,7 @@ public:
     heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
     heartbeat_timer_ = this->create_wall_timer(
         std::chrono::seconds(1), std::bind(&FeatureDetectionMiddleware::heartbeat_callback, this));
+    heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
     // Create a subscription to /scan topic
     scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 
                                                                            10,                           

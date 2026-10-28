@@ -17,6 +17,7 @@ class EKFMiddleware : public rclcpp::Node {
             heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
             heartbeat_timer_ = this->create_wall_timer(
                 std::chrono::seconds(1), std::bind(&EKFMiddleware::heartbeat_callback, this));
+            heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
             odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
               "/odom", 10, std::bind(&EKFMiddleware::odomCallback, this, std::placeholders::_1));
             imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(

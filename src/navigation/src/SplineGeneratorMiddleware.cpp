@@ -15,6 +15,7 @@ class SplineGeneratorMiddleware : public rclcpp::Node {
       heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
       heartbeat_timer_ = this->create_wall_timer(
           std::chrono::seconds(1), std::bind(&SplineGeneratorMiddleware::heartbeat_callback, this));
+      heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
       double sample_scale = this->declare_parameter<double>("sample_scale", 4.0);
       splineGenerator = std::make_shared<SplineGenerator>(sample_scale);
       

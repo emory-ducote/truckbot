@@ -16,6 +16,7 @@ public:
 		heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
 		heartbeat_timer_ = this->create_wall_timer(
 				std::chrono::seconds(1), std::bind(&PurePursuitControllerMiddleware::heartbeat_callback, this));
+		heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
 		double lookahead_distance = this->declare_parameter<double>("lookahead_distance", 1.0);
 		linear_velocity_ = this->declare_parameter<double>("linear_velocity", 0.15);
 		goal_tolerance_ = this->declare_parameter<double>("goal_tolerance", 0.1);

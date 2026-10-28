@@ -12,6 +12,7 @@ public:
         heartbeat_pub_ = this->create_publisher<truckbot_msgs::msg::Heartbeat>("/health/heartbeat", 10);
         heartbeat_timer_ = this->create_wall_timer(
                 std::chrono::seconds(1), std::bind(&CornerDetectorMiddleware::heartbeat_callback, this));
+        heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
         double mapResolution     = declare_parameter<double>("map_resolution",      0.05);
         double mapRange          = declare_parameter<double>("map_range",           6.0);
         int    maxCorners        = declare_parameter<int>   ("max_corners",         100);
