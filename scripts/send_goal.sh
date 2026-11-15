@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: ./scripts/send_goal.sh [x] [y] [frame_id]
-X=${1:-7.5}
-Y=${2:--1.0}
+X=${1:-7.25}
+Y=${2:--1.5}
 FRAME=${3:-map}
 
 ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
