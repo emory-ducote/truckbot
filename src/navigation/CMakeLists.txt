@@ -17,6 +17,7 @@ find_package(truckbot_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 
 INCLUDE_DIRECTORIES(
@@ -29,7 +30,7 @@ add_executable(path_tracker
 )
 
 target_link_libraries(path_tracker)
-ament_target_dependencies(path_tracker rclcpp truckbot_msgs nav_msgs std_msgs)
+ament_target_dependencies(path_tracker rclcpp truckbot_msgs nav_msgs std_msgs tf2_ros)
 
 add_executable(spline_generator
   src/SplineGeneratorMiddleware.cpp
@@ -52,7 +53,7 @@ add_executable(pure_pursuit_controller
 )
 
 target_link_libraries(pure_pursuit_controller)
-ament_target_dependencies(pure_pursuit_controller rclcpp truckbot_msgs nav_msgs geometry_msgs std_msgs)
+ament_target_dependencies(pure_pursuit_controller rclcpp truckbot_msgs nav_msgs geometry_msgs std_msgs tf2_ros)
 
 add_executable(cost_grid
   src/CostGridMiddleware.cpp

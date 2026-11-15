@@ -15,12 +15,19 @@ class MotorDriver {
                     const double Kp = 1.25,
                     const double Ki = 0.0,
                     const double Kd = 0.0,
-                    const double deadband = 0.0);
+                    const double deadband = 0.0,
+                    const double kS = 0.0,
+                    const double kV = 0.0,
+                    const double integralLimit = 1.0,
+                    const double kTurn = 0.0,
+                    const double slewRate = 0.0);
         ~MotorDriver();
         void setMeasuredSpeed(double v) { measuredSpeed.store(v); }
         double getMeasuredSpeed() const { return measuredSpeed.load(); }
         void setTargetSpeed(double v) { targetSpeed.store(v); }
         double getTargetSpeed() const { return targetSpeed.load(); }
+        void setTurnSpeed(double v) { turnSpeed.store(v); }
+        double getLastDuty() const { return lastDuty.load(); }
         // Returns false if writing the PWM to either pin failed
         bool updateMotorSpeed(const bool usePID);
     private:
@@ -32,12 +39,21 @@ class MotorDriver {
         int handle;
         std::atomic<double> measuredSpeed;
         std::atomic<double> targetSpeed;
+        std::atomic<double> lastDuty;
+        std::atomic<double> turnSpeed;
         double integralSpeed,
                prevErrorSpeed,
                Kp,
                Ki,
                Kd,
                deadband,
+               kS,
+               kV,
+               integralLimit,
+               kTurn,
+               slewRate,
+               rampedTarget,
+               rampedTurn,
                previousCalculationStamp;
 };
 
