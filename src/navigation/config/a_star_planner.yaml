@@ -6,3 +6,5 @@ a_star_planner:
     path_topic: "/global_path"
     cost_thresh: 65
     replan_period_ms: 500
+    goal_snap_radius: 1.0 
+    cost_weight: 3.0

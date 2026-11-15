@@ -25,7 +25,11 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       int costThresh = this->declare_parameter<int>("cost_thresh", 65);
       int replan_period_ms = this->declare_parameter<int>("replan_period_ms", 500);
 
+      goal_snap_radius_ = this->declare_parameter<double>("goal_snap_radius", 1.0);
+      double cost_weight = this->declare_parameter<double>("cost_weight", 3.0);
+
       a_star_planner_ = std::make_shared<AStarPlanner>(static_cast<int8_t>(costThresh));
+      a_star_planner_->setCostWeight(cost_weight);
 
       auto map_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
 
@@ -119,6 +123,24 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       std::pair<int, int> start = world_to_cell(current_pose_.x, current_pose_.y);
       std::pair<int, int> goal = world_to_cell(goal_pose_.x, goal_pose_.y);
 
+      // A goal inside an inflated obstacle zone is unreachable safely; move it to the nearest free cell
+      int snap_radius_cells = static_cast<int>(std::ceil(goal_snap_radius_ / grid_resolution_));
+      auto free_goal = a_star_planner_->nearestFreeCell(goal, snap_radius_cells);
+      if (free_goal.first < 0) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                             "Goal is in an obstacle zone with no free cell within %.2f m.", goal_snap_radius_);
+        health_state_ = truckbot_msgs::msg::Heartbeat::DEGRADED;
+        health_detail_ = "goal blocked";
+        return;
+      }
+      if (free_goal != goal) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                             "Goal is in an obstacle zone; snapped by %d cells.",
+                             static_cast<int>(std::lround(std::hypot(free_goal.first - goal.first,
+                                                                     free_goal.second - goal.second))));
+        goal = free_goal;
+      }
+
       auto path = a_star_planner_->findPath(start, goal);
       if (path.empty()) {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
@@ -171,6 +193,7 @@ class AStarPlannerMiddleware : public rclcpp::Node {
     std::string pose_topic_;
     std::string path_topic_;
     std::string grid_frame_;
+    double goal_snap_radius_ = 1.0;
     double grid_resolution_ = 1.0;
     double grid_origin_x_ = 0.0;
     double grid_origin_y_ = 0.0;

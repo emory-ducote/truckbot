@@ -188,3 +188,47 @@ TEST_F(AStarPlannerTest, PathHasNoRepeatedCells) {
     EXPECT_EQ(path.front(), Cell(0, 3));
     EXPECT_EQ(path.back(), Cell(7, 3));
 }
+
+// A free cell is returned unchanged.
+TEST_F(AStarPlannerTest, NearestFreeCellReturnsFreeCellUnchanged) {
+    makeGrid(10, 10);
+    AStarPlanner planner;
+    load(planner);
+    EXPECT_EQ(planner.nearestFreeCell({4, 4}, 3), Cell(4, 4));
+}
+
+// A blocked cell snaps to the closest free cell.
+TEST_F(AStarPlannerTest, NearestFreeCellSnapsOutOfObstacle) {
+    makeGrid(10, 10, kBlocked);
+    for (int col = 0; col < 3; ++col) {
+        block(col, 5, kFree);
+    }
+    AStarPlanner planner;
+    load(planner);
+    EXPECT_EQ(planner.nearestFreeCell({2, 6}, 3), Cell(2, 5));
+}
+
+// No free cell within the radius reports {-1, -1}.
+TEST_F(AStarPlannerTest, NearestFreeCellOutOfRadiusFails) {
+    makeGrid(10, 10, kBlocked);
+    block(9, 9, kFree);
+    AStarPlanner planner;
+    load(planner);
+    EXPECT_EQ(planner.nearestFreeCell({0, 0}, 3), Cell(-1, -1));
+}
+
+// With a cost weight, the planner detours around a costly (but traversable) band.
+TEST_F(AStarPlannerTest, CostWeightPrefersLowCostRoute) {
+    makeGrid(7, 5);
+    for (int col = 2; col <= 4; ++col) {
+        block(col, 2, 60);
+    }
+    AStarPlanner planner;
+    planner.setCostWeight(5.0);
+    load(planner);
+    Path path = planner.findPath({0, 2}, {6, 2});
+    ASSERT_FALSE(path.empty());
+    for (const auto& c : path) {
+        EXPECT_LT(costs[static_cast<size_t>(c.second) * width + c.first], 60);
+    }
+}

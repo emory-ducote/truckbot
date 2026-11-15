@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
@@ -43,6 +44,38 @@ bool AStarPlanner::inBounds(int col, int row) const
     return (col >= 0) && (col < width) && (row >= 0) && (row < height);
 }
 
+bool AStarPlanner::isFree(int col, int row) const
+{
+    return inBounds(col, row) && costs[index(col, row)] < costThresh;
+}
+
+void AStarPlanner::setCostWeight(double weight)
+{
+    this->costWeight = weight;
+}
+
+std::pair<int, int> AStarPlanner::nearestFreeCell(const std::pair<int, int>& cell, int maxRadiusCells) const
+{
+    if (isFree(cell.first, cell.second)) {
+        return cell;
+    }
+
+    std::pair<int, int> best{-1, -1};
+    double bestDist = std::numeric_limits<double>::infinity();
+    for (int dRow = -maxRadiusCells; dRow <= maxRadiusCells; ++dRow) {
+        for (int dCol = -maxRadiusCells; dCol <= maxRadiusCells; ++dCol) {
+            int col = cell.first + dCol;
+            int row = cell.second + dRow;
+            double dist = std::hypot(static_cast<double>(dCol), static_cast<double>(dRow));
+            if (dist <= maxRadiusCells && dist < bestDist && isFree(col, row)) {
+                bestDist = dist;
+                best = {col, row};
+            }
+        }
+    }
+    return best;
+}
+
 std::vector<std::pair<int, int>> AStarPlanner::getNeighbors(int col, int row)
 {
     static const int offsets[8][2] = {
@@ -56,7 +89,7 @@ std::vector<std::pair<int, int>> AStarPlanner::getNeighbors(int col, int row)
     for (const auto& offset : offsets) {
         int neighborCol = col + offset[0];
         int neighborRow = row + offset[1];
-        if (inBounds(neighborCol, neighborRow) && costs[index(neighborCol, neighborRow)] < costThresh) {
+        if (isFree(neighborCol, neighborRow)) {
             neighbors.push_back({neighborCol, neighborRow});
         }
     }
@@ -124,9 +157,12 @@ std::vector<std::pair<int, int>> AStarPlanner::findPath(const std::pair<int, int
                 continue;
             }
 
-            auto tempG = currentNode->g + 
-                           distanceHeuristic(currentNode->col, currentNode->row, neighborCol, neighborRow);
-            
+            // Penalize stepping into costly cells so paths prefer clearance over hugging obstacles
+            double neighborCost = std::max<int>(costs[neighborIdx], 0) / 100.0;
+            auto tempG = currentNode->g +
+                           distanceHeuristic(currentNode->col, currentNode->row, neighborCol, neighborRow) *
+                           (1.0 + costWeight * neighborCost);
+
 
             if (!openDict.count(neighborIdx)) 
             {
