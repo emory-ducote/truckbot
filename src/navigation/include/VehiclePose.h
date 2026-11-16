@@ -44,6 +44,17 @@ struct VehiclePose {
             0.0
         );
     }
+
+    // Express a pose given in this pose's frame in the parent frame (e.g. map->odom composed with odom->base)
+    VehiclePose compose(const VehiclePose& local) const {
+        double c = std::cos(theta);
+        double s = std::sin(theta);
+        return VehiclePose(
+            x + c * local.x - s * local.y,
+            y + s * local.x + c * local.y,
+            std::remainder(theta + local.theta, 2.0 * M_PI)
+        );
+    }
 };
 
 } 

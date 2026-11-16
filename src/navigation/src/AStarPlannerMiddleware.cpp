@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cmath>
 #include "AStarPlanner.h"
+#include "TfPoseLookup.h"
 #include "VehiclePose.h"
 #include "rclcpp/rclcpp.hpp"
 #include "truckbot_msgs/msg/heartbeat.hpp"
@@ -20,7 +21,6 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
       cost_grid_topic_ = this->declare_parameter<std::string>("cost_grid_topic", "/cost_grid");
       goal_topic_ = this->declare_parameter<std::string>("goal_topic", "/goal_pose");
-      pose_topic_ = this->declare_parameter<std::string>("pose_topic", "/heaviest_particle_pose");
       path_topic_ = this->declare_parameter<std::string>("path_topic", "/global_path");
       int costThresh = this->declare_parameter<int>("cost_thresh", 65);
       int replan_period_ms = this->declare_parameter<int>("replan_period_ms", 500);
@@ -41,9 +41,12 @@ class AStarPlannerMiddleware : public rclcpp::Node {
           goal_topic_, 10,
           std::bind(&AStarPlannerMiddleware::goal_callback, this, std::placeholders::_1));
 
-      pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-          pose_topic_, 10,
-          std::bind(&AStarPlannerMiddleware::pose_callback, this, std::placeholders::_1));
+      navigation::TfPoseLookupConfig pose_config;
+      pose_config.globalFrame = this->declare_parameter<std::string>("global_frame", pose_config.globalFrame);
+      pose_config.odomFrame = this->declare_parameter<std::string>("odom_frame", pose_config.odomFrame);
+      pose_config.baseFrame = this->declare_parameter<std::string>("base_frame", pose_config.baseFrame);
+      pose_config.maxCorrectionAge = this->declare_parameter<double>("max_correction_age", pose_config.maxCorrectionAge);
+      pose_lookup_ = std::make_unique<navigation::TfPoseLookup>(*this, pose_config);
 
       path_pub_ = this->create_publisher<nav_msgs::msg::Path>(path_topic_, 10);
 
@@ -97,20 +100,19 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       goal_received_ = true;
     }
 
-    void pose_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-    {
-      auto& q = msg->pose.orientation;
-      double yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y),
-                              1.0 - 2.0 * (q.y * q.y + q.z * q.z));
-      current_pose_ = navigation::VehiclePose(msg->pose.position.x,
-                                              msg->pose.position.y,
-                                              yaw);
-      pose_received_ = true;
-    }
-
     void replan_timer_callback()
     {
-      if (!pose_received_ || !cost_grid_received_) {
+      auto current_pose = pose_lookup_->lookup();
+      if (!current_pose) {
+        // Planning from a stale pose would hand the followers a path that starts in the wrong place
+        if (pose_received_) {
+          health_state_ = truckbot_msgs::msg::Heartbeat::DEGRADED;
+          health_detail_ = pose_lookup_->chainName() + " tf unavailable";
+        }
+        return;
+      }
+      pose_received_ = true;
+      if (!cost_grid_received_) {
         return;
       }
       // Ready and waiting on a goal is normal operation, not INIT
@@ -120,7 +122,7 @@ class AStarPlannerMiddleware : public rclcpp::Node {
         return;
       }
 
-      std::pair<int, int> start = world_to_cell(current_pose_.x, current_pose_.y);
+      std::pair<int, int> start = world_to_cell(current_pose->x, current_pose->y);
       std::pair<int, int> goal = world_to_cell(goal_pose_.x, goal_pose_.y);
 
       // A goal inside an inflated obstacle zone is unreachable safely; move it to the nearest free cell
@@ -184,13 +186,12 @@ class AStarPlannerMiddleware : public rclcpp::Node {
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr cost_grid_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
     rclcpp::TimerBase::SharedPtr replan_timer_;
     std::shared_ptr<AStarPlanner> a_star_planner_;
+    std::unique_ptr<navigation::TfPoseLookup> pose_lookup_;
     std::string cost_grid_topic_;
     std::string goal_topic_;
-    std::string pose_topic_;
     std::string path_topic_;
     std::string grid_frame_;
     double goal_snap_radius_ = 1.0;
@@ -198,7 +199,6 @@ class AStarPlannerMiddleware : public rclcpp::Node {
     double grid_origin_x_ = 0.0;
     double grid_origin_y_ = 0.0;
     navigation::VehiclePose goal_pose_;
-    navigation::VehiclePose current_pose_;
     bool goal_received_ = false;
     bool pose_received_ = false;
     rclcpp::TimerBase::SharedPtr heartbeat_timer_;
