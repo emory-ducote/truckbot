@@ -7,6 +7,7 @@
 #include "std_msgs/msg/int64.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "PathTracker.h"
+#include "TfPoseLookup.h"
 
 
 class PathTrackerMiddleware : public rclcpp::Node {
@@ -17,8 +18,13 @@ class PathTrackerMiddleware : public rclcpp::Node {
       heartbeat_timer_ = this->create_wall_timer(
           std::chrono::seconds(1), std::bind(&PathTrackerMiddleware::heartbeat_callback, this));
       heartbeat_callback();  // publish INIT immediately so the monitor knows this node exists
-      odom_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-                "/heaviest_particle_pose", 10, std::bind(&PathTrackerMiddleware::odomCallback, this, std::placeholders::_1));
+      // Same TF-composed pose as the pure pursuit controller, so both agree on where the vehicle is
+      navigation::TfPoseLookupConfig pose_config;
+      pose_config.globalFrame = this->declare_parameter<std::string>("global_frame", pose_config.globalFrame);
+      pose_config.odomFrame = this->declare_parameter<std::string>("odom_frame", pose_config.odomFrame);
+      pose_config.baseFrame = this->declare_parameter<std::string>("base_frame", pose_config.baseFrame);
+      pose_config.maxCorrectionAge = this->declare_parameter<double>("max_correction_age", pose_config.maxCorrectionAge);
+      pose_lookup_ = std::make_unique<navigation::TfPoseLookup>(*this, pose_config);
       path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
                 "/global_path", 10, std::bind(&PathTrackerMiddleware::pathCallback, this, std::placeholders::_1));
       global_path_index_pub_ = this->create_publisher<std_msgs::msg::Int64>("/global_path_index", 10);
@@ -39,16 +45,15 @@ class PathTrackerMiddleware : public rclcpp::Node {
       heartbeat_pub_->publish(heartbeat);
     }
 
-    void odomCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    bool updatePoseFromTf()
     {
-      auto& q = msg->pose.orientation;
-      double yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y),
-                              1.0 - 2.0 * (q.y * q.y + q.z * q.z));
-      navigation::VehiclePose newPose(msg->pose.position.x,
-                                      msg->pose.position.y,
-                                      yaw);
-      pathTracker->setVehiclePose(newPose);
+      auto pose = pose_lookup_->lookup();
+      if (!pose) {
+        return false;
+      }
+      pathTracker->setVehiclePose(*pose);
       pose_received_ = true;
+      return true;
     }
     void pathCallback(const nav_msgs::msg::Path::SharedPtr msg)
     {
@@ -64,6 +69,11 @@ class PathTrackerMiddleware : public rclcpp::Node {
     }
     void timerCallback()
     {
+      if (!updatePoseFromTf() && pose_received_) {
+        health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+        health_detail_ = pose_lookup_->chainName() + " tf unavailable";
+        return;
+      }
       int closestIndex = pathTracker->findNearestPose();
       if (pose_received_) {
         // A path with no nearest index means the pose or path contains NaNs
@@ -93,7 +103,7 @@ class PathTrackerMiddleware : public rclcpp::Node {
       }
     }
 
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr odom_sub_;
+    std::unique_ptr<navigation::TfPoseLookup> pose_lookup_;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
     rclcpp::Publisher<std_msgs::msg::Int64>::SharedPtr global_path_index_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_path_point_pub_;

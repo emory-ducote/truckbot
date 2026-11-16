@@ -15,7 +15,12 @@ MotorDriver::MotorDriver(const uint8_t& chip,
                          const double Kp,
                          const double Ki,
                          const double Kd,
-                         const double deadband)
+                         const double deadband,
+                         const double kS,
+                         const double kV,
+                         const double integralLimit,
+                         const double kTurn,
+                         const double slewRate)
                          : chip(chip),
                            pinOne(pinOne),
                            pinTwo(pinTwo),
@@ -23,7 +28,16 @@ MotorDriver::MotorDriver(const uint8_t& chip,
                            Ki(Ki),
                            Kd(Kd),
                            deadband(deadband),
+                           kS(kS),
+                           kV(kV),
+                           integralLimit(integralLimit),
+                           kTurn(kTurn),
+                           slewRate(slewRate),
+                           rampedTarget(0.0),
+                           rampedTurn(0.0),
                            measuredSpeed(0.0),
+                           lastDuty(0.0),
+                           turnSpeed(0.0),
                            prevErrorSpeed(0.0),
                            integralSpeed(0.0)
 { 
@@ -66,6 +80,17 @@ bool MotorDriver::updateMotorSpeed(const bool usePID)
     double speed = target;
     if (usePID)
     {
+        // Rate-limit the target (and its turn component) so command steps become ramps
+        double turn = turnSpeed.load();
+        if (slewRate > 0.0)
+        {
+            double step = slewRate * dt;
+            rampedTarget += std::clamp(target - rampedTarget, -step, step);
+            rampedTurn += std::clamp(turn - rampedTurn, -step, step);
+            target = rampedTarget;
+            turn = rampedTurn;
+        }
+
         if (target == 0.0)
         {
             integralSpeed = 0.0;
@@ -74,19 +99,37 @@ bool MotorDriver::updateMotorSpeed(const bool usePID)
         else
         {
             double error = target - measuredSpeed.load();
-            if (std::abs(error) < deadband)
+            bool withinDeadband = std::abs(error) < deadband;
+            if (withinDeadband) { error = 0.0; }
+
+            double direction = target > 0.0 ? 1.0 : -1.0;
+            double staticFrictionDuty = kS * direction;
+            double velocityDuty = kV * target;
+            double turnScrubDuty = kTurn * turn;
+            double feedforwardDuty = staticFrictionDuty + velocityDuty + turnScrubDuty;
+
+            double proportionalDuty = Kp * error;
+            double derivativeDuty = Kd * (error - prevErrorSpeed) / dt;
+            double dutyBeforeIntegralUpdate = feedforwardDuty + proportionalDuty + Ki * integralSpeed + derivativeDuty;
+
+            const double maxDuty = 0.99;
+            bool saturated = std::abs(dutyBeforeIntegralUpdate) >= maxDuty;
+            bool errorUnwindsSaturation = error * dutyBeforeIntegralUpdate < 0.0;
+            bool shouldIntegrate = Ki > 0.0 && (!saturated || errorUnwindsSaturation);
+            if (shouldIntegrate)
             {
-                prevErrorSpeed = error;
-                return true;
+                double maxIntegral = integralLimit / Ki;
+                integralSpeed = std::clamp(integralSpeed + error * dt, -maxIntegral, maxIntegral);
             }
-            integralSpeed = std::clamp(integralSpeed + error * dt, -1.0, 1.0);
-            double derivative = (error - prevErrorSpeed) / dt;
-            speed = Kp * error + Ki * integralSpeed + Kd * derivative;
+            double integralDuty = Ki * integralSpeed;
+
+            speed = feedforwardDuty + proportionalDuty + integralDuty + derivativeDuty;
             prevErrorSpeed = error;
         }
     }
 
     double duty = speedToPWM(speed);
+    lastDuty.store(std::clamp(speed, -0.99, 0.99));
     double dutyOne = 0.0;
     double dutyTwo = 0.0;
     if (speed < 0) { dutyOne = duty; }

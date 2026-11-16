@@ -4,3 +4,8 @@ pure_pursuit_controller:
     linear_velocity: 0.2
     goal_tolerance: 0.1
     timer_period_ms: 10
+    slowdown_angle_deg: 30.0
+    min_speed_scale: 0.3
+    turn_in_place_angle_deg: 90.0
+    turn_in_place_exit_angle_deg: 45.0
+    turn_in_place_omega: 1.2

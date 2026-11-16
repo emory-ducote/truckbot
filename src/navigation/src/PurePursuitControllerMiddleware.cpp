@@ -8,6 +8,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "PurePursuitController.h"
+#include "TfPoseLookup.h"
 
 class PurePursuitControllerMiddleware : public rclcpp::Node {
 public:
@@ -22,9 +23,21 @@ public:
 		goal_tolerance_ = this->declare_parameter<double>("goal_tolerance", 0.1);
 		int timer_period_ms = this->declare_parameter<int>("timer_period_ms", 10);
       	purePursuitController = std::make_shared<PurePursuitController>(lookahead_distance);
+		constexpr double deg2rad = M_PI / 180.0;
+		PurePursuitTuning tuning;
+		tuning.slowdownAngle = deg2rad * this->declare_parameter<double>("slowdown_angle_deg", 30.0);
+		tuning.minSpeedScale = this->declare_parameter<double>("min_speed_scale", tuning.minSpeedScale);
+		tuning.turnInPlaceAngle = deg2rad * this->declare_parameter<double>("turn_in_place_angle_deg", 90.0);
+		tuning.turnInPlaceExitAngle = deg2rad * this->declare_parameter<double>("turn_in_place_exit_angle_deg", 45.0);
+		tuning.turnInPlaceOmega = this->declare_parameter<double>("turn_in_place_omega", tuning.turnInPlaceOmega);
+		purePursuitController->setTuning(tuning);
 
-		odom_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-			"/heaviest_particle_pose", 10, std::bind(&PurePursuitControllerMiddleware::odomCallback, this, std::placeholders::_1));
+		navigation::TfPoseLookupConfig pose_config;
+		pose_config.globalFrame = this->declare_parameter<std::string>("global_frame", pose_config.globalFrame);
+		pose_config.odomFrame = this->declare_parameter<std::string>("odom_frame", pose_config.odomFrame);
+		pose_config.baseFrame = this->declare_parameter<std::string>("base_frame", pose_config.baseFrame);
+		pose_config.maxCorrectionAge = this->declare_parameter<double>("max_correction_age", pose_config.maxCorrectionAge);
+		pose_lookup_ = std::make_unique<navigation::TfPoseLookup>(*this, pose_config);
 		local_path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
 			"/local_path", 10, std::bind(&PurePursuitControllerMiddleware::localPathCallback, this, std::placeholders::_1));
 		cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
@@ -46,17 +59,16 @@ private:
 		heartbeat_pub_->publish(heartbeat);
 	}
 
-	void odomCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
-    {
-      auto& q = msg->pose.orientation;
-      double yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y),
-                              1.0 - 2.0 * (q.y * q.y + q.z * q.z));
-      navigation::VehiclePose newPose(msg->pose.position.x,
-                                      msg->pose.position.y,
-                                      yaw);
-      purePursuitController->setVehiclePose(newPose);
-      pose_received_ = true;
-    }
+	bool updatePoseFromTf()
+	{
+		auto pose = pose_lookup_->lookup();
+		if (!pose) {
+			return false;
+		}
+		purePursuitController->setVehiclePose(*pose);
+		pose_received_ = true;
+		return true;
+	}
 
 	void localPathCallback(const nav_msgs::msg::Path::SharedPtr msg)
 	{
@@ -77,6 +89,13 @@ private:
 
 	void timerCallback()
 	{
+		if (!updatePoseFromTf() && pose_received_) {
+			// Lost localization after having it: stop rather than drive on a frozen pose
+			cmd_vel_pub_->publish(geometry_msgs::msg::Twist());
+			health_state_ = truckbot_msgs::msg::Heartbeat::FAILED;
+			health_detail_ = pose_lookup_->chainName() + " tf unavailable";
+			return;
+		}
 		if (!pose_received_ || purePursuitController->getLocalPath().empty()) {
 			RCLCPP_INFO(this->get_logger(), "Waiting for pose and path initialization");
 			// Having a pose but no path just means no goal yet
@@ -91,8 +110,8 @@ private:
 		try {
 			auto globalLookahead = purePursuitController->calculateLookaheadPoint();
 			auto localLookahead = purePursuitController->localLookahead(globalLookahead);
-			auto omega = purePursuitController->computeControl(localLookahead, linear_velocity_);
-			RCLCPP_INFO(this->get_logger(), "PurePursuit omega chosen: %f", omega);
+			auto command = purePursuitController->computeCommand(localLookahead, linear_velocity_);
+			RCLCPP_INFO(this->get_logger(), "PurePursuit v: %f omega: %f", command.linear, command.angular);
 			geometry_msgs::msg::Twist cmd_msg;
 			// Stop on distance to the final goal, not the lookahead point (which trails the vehicle by Ld)
 			double distance = purePursuitController->getVehiclePose().euclideanDistanceTo(final_goal_);
@@ -105,8 +124,8 @@ private:
 			}
 			else
 			{
-				cmd_msg.linear.x = linear_velocity_;
-				cmd_msg.angular.z = omega;
+				cmd_msg.linear.x = command.linear;
+				cmd_msg.angular.z = command.angular;
 			}
 			cmd_vel_pub_->publish(cmd_msg);
 			
@@ -136,7 +155,7 @@ private:
 		}
 	}
 
-	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr odom_sub_;
+	std::unique_ptr<navigation::TfPoseLookup> pose_lookup_;
 	rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr local_path_sub_;
 	rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr global_lookahead_pub_;

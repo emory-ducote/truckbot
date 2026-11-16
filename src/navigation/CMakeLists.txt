@@ -17,6 +17,7 @@ find_package(truckbot_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 
 INCLUDE_DIRECTORIES(
@@ -26,10 +27,11 @@ INCLUDE_DIRECTORIES(
 add_executable(path_tracker
   src/PathTrackerMiddleware.cpp
   src/PathTracker.cpp
+  src/TfPoseLookup.cpp
 )
 
 target_link_libraries(path_tracker)
-ament_target_dependencies(path_tracker rclcpp truckbot_msgs nav_msgs std_msgs)
+ament_target_dependencies(path_tracker rclcpp truckbot_msgs nav_msgs std_msgs tf2_ros)
 
 add_executable(spline_generator
   src/SplineGeneratorMiddleware.cpp
@@ -49,10 +51,11 @@ ament_target_dependencies(simple_path_server rclcpp truckbot_msgs nav_msgs geome
 add_executable(pure_pursuit_controller
   src/PurePursuitControllerMiddleware.cpp
   src/PurePursuitController.cpp
+  src/TfPoseLookup.cpp
 )
 
 target_link_libraries(pure_pursuit_controller)
-ament_target_dependencies(pure_pursuit_controller rclcpp truckbot_msgs nav_msgs geometry_msgs std_msgs)
+ament_target_dependencies(pure_pursuit_controller rclcpp truckbot_msgs nav_msgs geometry_msgs std_msgs tf2_ros)
 
 add_executable(cost_grid
   src/CostGridMiddleware.cpp
@@ -65,10 +68,11 @@ ament_target_dependencies(cost_grid rclcpp truckbot_msgs nav_msgs std_msgs)
 add_executable(a_star_planner
   src/AStarPlannerMiddleware.cpp
   src/AStarPlanner.cpp
+  src/TfPoseLookup.cpp
 )
 
 target_link_libraries(a_star_planner)
-ament_target_dependencies(a_star_planner rclcpp truckbot_msgs nav_msgs geometry_msgs)
+ament_target_dependencies(a_star_planner rclcpp truckbot_msgs nav_msgs geometry_msgs tf2_ros)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -76,6 +80,10 @@ if(BUILD_TESTING)
   ament_add_gtest(test_a_star_planner
     test/test_a_star_planner.cpp
     src/AStarPlanner.cpp
+  )
+
+  ament_add_gtest(test_vehicle_pose
+    test/test_vehicle_pose.cpp
   )
 endif()
 

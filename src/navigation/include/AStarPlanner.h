@@ -35,12 +35,15 @@ class AStarPlanner {
                       double originY);
         std::vector<std::pair<int, int>> findPath(const std::pair<int, int>& start,
                                                   const std::pair<int, int>& goal);
+        void setCostWeight(double weight);
+        std::pair<int, int> nearestFreeCell(const std::pair<int, int>& cell, int maxRadiusCells) const;
 
     private:
         double distanceHeuristic(int firstCol, int firstRow, int secondCol, int secondRow) const;
         std::vector<std::pair<int, int>> getNeighbors(int col, int row);
         std::vector<std::pair<int, int>> reconstructPath(std::shared_ptr<AStarNode> goalNode) const;
         bool inBounds(int col, int row) const;
+        bool isFree(int col, int row) const;
         int index(int col, int row) const { return row * width + col; }
 
         double resolution;
@@ -50,6 +53,7 @@ class AStarPlanner {
         double originY;
         std::vector<int8_t> costs;
         int8_t costThresh;
+        double costWeight = 0.0;
 };
 
 #endif

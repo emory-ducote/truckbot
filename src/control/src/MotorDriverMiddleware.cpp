@@ -40,8 +40,14 @@ class MotorDriverMiddleware : public rclcpp::Node {
           double Ki = this->declare_parameter<double>("Ki", 0.0);
           double Kd = this->declare_parameter<double>("Kd", 0.0);
           double deadband = this->declare_parameter<double>("deadband", 0.0);
+          double kS = this->declare_parameter<double>("kS", 0.0);
+          double kV = this->declare_parameter<double>("kV", 0.0);
+          double integralLimit = this->declare_parameter<double>("integral_limit", 1.0);
+          double kTurn = this->declare_parameter<double>("kTurn", 0.0);
+          double slewRate = this->declare_parameter<double>("target_slew_rate", 0.0);
 
-          RCLCPP_INFO(this->get_logger(), "KP, KI, KD: %f, %f, %f", Kp, Ki, Kd);
+          RCLCPP_INFO(this->get_logger(), "KP, KI, KD: %f, %f, %f  kS, kV, kTurn: %f, %f, %f  integral_limit: %f  slew: %f",
+                      Kp, Ki, Kd, kS, kV, kTurn, integralLimit, slewRate);
 
 
           std::string wheel_control_topic = this->declare_parameter<std::string>("wheel_control_topic", "/cmd_vel");
@@ -49,10 +55,10 @@ class MotorDriverMiddleware : public rclcpp::Node {
 
           // On GPIO setup failure, stay alive only to report FAILED
           try {
-            rightFront = std::make_shared<MotorDriver>(chip, rightFrontOne, rightFrontTwo, Kp, Ki, Kd, deadband);
-            rightRear = std::make_shared<MotorDriver>(chip, rightRearOne, rightRearTwo, Kp, Ki, Kd, deadband);
-            leftFront = std::make_shared<MotorDriver>(chip, leftFrontOne, leftFrontTwo, Kp, Ki, Kd, deadband);
-            leftRear = std::make_shared<MotorDriver>(chip, leftRearOne, leftRearTwo, Kp, Ki, Kd, deadband);
+            rightFront = std::make_shared<MotorDriver>(chip, rightFrontOne, rightFrontTwo, Kp, Ki, Kd, deadband, kS, kV, integralLimit, kTurn, slewRate);
+            rightRear = std::make_shared<MotorDriver>(chip, rightRearOne, rightRearTwo, Kp, Ki, Kd, deadband, kS, kV, integralLimit, kTurn, slewRate);
+            leftFront = std::make_shared<MotorDriver>(chip, leftFrontOne, leftFrontTwo, Kp, Ki, Kd, deadband, kS, kV, integralLimit, kTurn, slewRate);
+            leftRear = std::make_shared<MotorDriver>(chip, leftRearOne, leftRearTwo, Kp, Ki, Kd, deadband, kS, kV, integralLimit, kTurn, slewRate);
             lift = std::make_shared<MotorDriver>(chip, liftOne, liftTwo);
           } catch (const std::exception& e) {
             RCLCPP_FATAL(this->get_logger(), "Motor setup failed: %s", e.what());
@@ -75,6 +81,12 @@ class MotorDriverMiddleware : public rclcpp::Node {
             rightFrontTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ rightFront->setMeasuredSpeed(msg->data); });
           right_rear_enc_sub_ = this->create_subscription<std_msgs::msg::Float64>(
             rightRearTopic, 10, [this](const std_msgs::msg::Float64::SharedPtr msg){ rightRear->setMeasuredSpeed(msg->data); });
+
+          // Per-wheel commanded duty, for tuning feedforward/PID from bags
+          left_front_duty_pub_ = this->create_publisher<std_msgs::msg::Float64>("/motor_duty/left_front", 10);
+          left_rear_duty_pub_ = this->create_publisher<std_msgs::msg::Float64>("/motor_duty/left_rear", 10);
+          right_front_duty_pub_ = this->create_publisher<std_msgs::msg::Float64>("/motor_duty/right_front", 10);
+          right_rear_duty_pub_ = this->create_publisher<std_msgs::msg::Float64>("/motor_duty/right_rear", 10);
 
           cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
               wheel_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdVelCallback, this, std::placeholders::_1));
@@ -102,7 +114,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
         double linearX = msg->linear.x;
         double angularZ = msg->angular.z;
 
-        RCLCPP_INFO(this->get_logger(), "Received Velocity Command: linear x: %f, angular z: %f", linearX, angularZ);
+        RCLCPP_DEBUG(this->get_logger(), "Received Velocity Command: linear x: %f, angular z: %f", linearX, angularZ);
 
         double angularScaleFactor = 1.75;
     
@@ -114,6 +126,12 @@ class MotorDriverMiddleware : public rclcpp::Node {
         double rightRearVel = linearX + (vehicleWidth/2.0) * angularZ * angularScaleFactor;
         double leftFrontVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor;
         double leftRearVel = linearX - (vehicleWidth/2.0) * angularZ * angularScaleFactor;
+
+        double turnVel = (vehicleWidth/2.0) * angularZ * angularScaleFactor;
+        rightFront->setTurnSpeed(turnVel);
+        rightRear->setTurnSpeed(turnVel);
+        leftFront->setTurnSpeed(-turnVel);
+        leftRear->setTurnSpeed(-turnVel);
 
         rightFront->setTargetSpeed(rightFrontVel);
         rightRear->setTargetSpeed(rightRearVel);
@@ -141,6 +159,13 @@ class MotorDriverMiddleware : public rclcpp::Node {
           pwmOk &= leftFront->updateMotorSpeed(true);
           pwmOk &= leftRear->updateMotorSpeed(true);
           pwmOk &= lift->updateMotorSpeed(false);
+
+          std_msgs::msg::Float64 m;
+          m.data = leftFront->getLastDuty(); left_front_duty_pub_->publish(m);
+          m.data = leftRear->getLastDuty(); left_rear_duty_pub_->publish(m);
+          m.data = rightFront->getLastDuty(); right_front_duty_pub_->publish(m);
+          m.data = rightRear->getLastDuty(); right_rear_duty_pub_->publish(m);
+
           if (pwmOk) {
             health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
             health_detail_ = "";
@@ -156,6 +181,10 @@ class MotorDriverMiddleware : public rclcpp::Node {
       rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr left_rear_enc_sub_;
       rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr right_front_enc_sub_;
       rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr right_rear_enc_sub_;
+      rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr left_front_duty_pub_;
+      rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr left_rear_duty_pub_;
+      rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr right_front_duty_pub_;
+      rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr right_rear_duty_pub_;
       std::shared_ptr<MotorDriver> rightFront;
       std::shared_ptr<MotorDriver> rightRear;
       std::shared_ptr<MotorDriver> leftFront;
