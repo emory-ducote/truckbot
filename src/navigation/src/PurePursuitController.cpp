@@ -71,3 +71,37 @@ double PurePursuitController::computeControl(const navigation::VehiclePose local
         // angular velocity (unicycle model)
         return v * kappa;
     }
+
+void PurePursuitController::setTuning(const PurePursuitTuning& newTuning)
+{
+    this->tuning = newTuning;
+}
+
+PurePursuitCommand PurePursuitController::computeCommand(const navigation::VehiclePose localLookahead, const double v)
+{
+    double headingError = std::atan2(localLookahead.y, localLookahead.x);
+    double absError = std::fabs(headingError);
+
+    // Hysteresis so we don't chatter around the threshold
+    if (turningInPlace) {
+        if (absError < tuning.turnInPlaceExitAngle) {
+            turningInPlace = false;
+        }
+    } else if (absError > tuning.turnInPlaceAngle) {
+        turningInPlace = true;
+    }
+
+    if (turningInPlace) {
+        return {0.0, std::copysign(tuning.turnInPlaceOmega, headingError)};
+    }
+
+    // Slow linearly from full speed at slowdownAngle to minSpeedScale at turnInPlaceAngle
+    double scale = 1.0;
+    if (absError > tuning.slowdownAngle) {
+        double span = tuning.turnInPlaceAngle - tuning.slowdownAngle;
+        double t = span > 0.0 ? std::min((absError - tuning.slowdownAngle) / span, 1.0) : 1.0;
+        scale = 1.0 - t * (1.0 - tuning.minSpeedScale);
+    }
+    double vCmd = v * scale;
+    return {vCmd, computeControl(localLookahead, vCmd)};
+}
