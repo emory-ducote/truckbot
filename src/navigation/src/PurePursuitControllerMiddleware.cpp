@@ -7,6 +7,7 @@
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "PurePursuitController.h"
 #include "TfPoseLookup.h"
 
@@ -43,6 +44,7 @@ public:
 		cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 		global_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/global_lookahead", 10);
 		local_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/local_lookahead", 10);
+		goal_reached_pub_ = this->create_publisher<std_msgs::msg::Bool>("/goal_reached", 10);
 		timer_ = this->create_wall_timer(
 			std::chrono::milliseconds(timer_period_ms),
 			std::bind(&PurePursuitControllerMiddleware::timerCallback, this));
@@ -120,6 +122,11 @@ private:
 			{
 				cmd_msg.linear.x = 0.0;
 				cmd_msg.angular.z = 0.0;
+				if (!mission_done) {
+					std_msgs::msg::Bool reached;
+					reached.data = true;
+					goal_reached_pub_->publish(reached);
+				}
 				mission_done = true;
 			}
 			else
@@ -160,6 +167,7 @@ private:
 	rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr global_lookahead_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr local_lookahead_pub_;
+	rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr goal_reached_pub_;
 	rclcpp::TimerBase::SharedPtr timer_;
 	std::shared_ptr<PurePursuitController> purePursuitController;
 	double linear_velocity_;

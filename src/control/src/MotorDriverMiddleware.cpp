@@ -36,6 +36,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
           int leftRearTwo = this->declare_parameter<int>("left_rear_two", 18);
           int liftOne = this->declare_parameter<int>("lift_one", 17);
           int liftTwo = this->declare_parameter<int>("lift_two", 27);
+          liftTravelTime = this->declare_parameter<double>("lift_travel_time", 5.0);
           double Kp = this->declare_parameter<double>("Kp", 1.25);
           double Ki = this->declare_parameter<double>("Ki", 0.0);
           double Kd = this->declare_parameter<double>("Kd", 0.0);
@@ -90,6 +91,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
 
           cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
               wheel_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdVelCallback, this, std::placeholders::_1));
+          lift_done_pub_ = this->create_publisher<std_msgs::msg::Bool>("/lift_done", 10);
           cmd_actuator_sub_ = this->create_subscription<std_msgs::msg::Bool>(
               actuator_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdActuatorCallback, this, std::placeholders::_1));
 
@@ -151,6 +153,22 @@ class MotorDriverMiddleware : public rclcpp::Node {
           lift->setTargetSpeed(-1.0);
         }
         RCLCPP_INFO(this->get_logger(), "Received Actuator Command: enabled: %d", actuatorEnabled);
+
+        // Restart on every command so a reversal mid-travel waits the full travel time
+        if (lift_timer_) {
+          lift_timer_->cancel();
+        }
+        lift_timer_ = this->create_wall_timer(
+          std::chrono::duration<double>(liftTravelTime),
+          [this, actuatorEnabled]() { lift_done_callback(actuatorEnabled); });
+      }
+      void lift_done_callback(bool actuatorEnabled)
+      {
+        lift_timer_->cancel();
+        std_msgs::msg::Bool msg;
+        msg.data = actuatorEnabled;
+        lift_done_pub_->publish(msg);
+        RCLCPP_INFO(this->get_logger(), "Lift done moving: enabled: %d", actuatorEnabled);
       }
       void timer_callback()
         {
@@ -191,6 +209,9 @@ class MotorDriverMiddleware : public rclcpp::Node {
       std::shared_ptr<MotorDriver> leftRear;
       std::shared_ptr<MotorDriver> lift;
       double vehicleWidth, wheelRadius;
+      double liftTravelTime;
+      rclcpp::TimerBase::SharedPtr lift_timer_;
+      rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr lift_done_pub_;
       rclcpp::TimerBase::SharedPtr heartbeat_timer_;
       rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
       uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
