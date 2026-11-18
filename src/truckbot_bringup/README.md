@@ -29,6 +29,7 @@ map
 - icm20948_driver
 - health
 - dashboard
+- missions
 
 ## Building
 

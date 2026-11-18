@@ -7,7 +7,6 @@
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
-#include "std_msgs/msg/bool.hpp"
 #include "PurePursuitController.h"
 #include "TfPoseLookup.h"
 
@@ -44,7 +43,9 @@ public:
 		cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 		global_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/global_lookahead", 10);
 		local_lookahead_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/local_lookahead", 10);
-		goal_reached_pub_ = this->create_publisher<std_msgs::msg::Bool>("/goal_reached", 10);
+		goal_reached_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_reached", 10);
+		goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+			"/goal_pose", 10, std::bind(&PurePursuitControllerMiddleware::goal_callback, this, std::placeholders::_1));
 		timer_ = this->create_wall_timer(
 			std::chrono::milliseconds(timer_period_ms),
 			std::bind(&PurePursuitControllerMiddleware::timerCallback, this));
@@ -59,6 +60,13 @@ private:
 		heartbeat.state = health_state_;
 		heartbeat.detail = health_detail_;
 		heartbeat_pub_->publish(heartbeat);
+	}
+
+	void goal_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+	{
+		requested_goal_.header = msg->header;
+		requested_goal_.point = msg->pose.position;
+		have_requested_goal_ = true;
 	}
 
 	bool updatePoseFromTf()
@@ -123,9 +131,7 @@ private:
 				cmd_msg.linear.x = 0.0;
 				cmd_msg.angular.z = 0.0;
 				if (!mission_done) {
-					std_msgs::msg::Bool reached;
-					reached.data = true;
-					goal_reached_pub_->publish(reached);
+					publish_goal_reached();
 				}
 				mission_done = true;
 			}
@@ -162,12 +168,28 @@ private:
 		}
 	}
 
+	// Reports the requested goal, since the path end can be snapped away from it
+	void publish_goal_reached()
+	{
+		geometry_msgs::msg::PointStamped reached = requested_goal_;
+		if (!have_requested_goal_) {
+			reached.header.frame_id = "map";
+			reached.point.x = final_goal_.x;
+			reached.point.y = final_goal_.y;
+		}
+		reached.header.stamp = this->now();
+		goal_reached_pub_->publish(reached);
+	}
+
 	std::unique_ptr<navigation::TfPoseLookup> pose_lookup_;
 	rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr local_path_sub_;
 	rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr global_lookahead_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr local_lookahead_pub_;
-	rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr goal_reached_pub_;
+	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_reached_pub_;
+	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
+	geometry_msgs::msg::PointStamped requested_goal_;
+	bool have_requested_goal_ = false;
 	rclcpp::TimerBase::SharedPtr timer_;
 	std::shared_ptr<PurePursuitController> purePursuitController;
 	double linear_velocity_;

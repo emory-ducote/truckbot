@@ -1,8 +1,10 @@
 #include "MissionRunner.h"
+#include <cmath>
 #include <stdexcept>
 
-MissionRunner::MissionRunner()
-    : missionIndex(0), stateIndex(0), waitingForGoal(false), waitingForLift(false), state(MissionState::IDLE)
+MissionRunner::MissionRunner(double goalMatchTolerance)
+    : missionIndex(0), stateIndex(0), waitingForGoal(false), waitingForLift(false), systemReady(false),
+      goalMatchTolerance(goalMatchTolerance), state(MissionState::IDLE)
 {
 }
 
@@ -22,12 +24,27 @@ void MissionRunner::loadMissions(const std::string& path)
     stateIndex = 0;
     waitingForGoal = false;
     waitingForLift = false;
+    lastReachedGoal.reset();
     state = MissionState::IDLE;
 }
 
-void MissionRunner::goalReached()
+void MissionRunner::setSystemReady()
 {
+    systemReady = true;
+}
+
+// Only a report for the current goal counts, so stale or repeated reports can't skip states
+void MissionRunner::goalReached(double x, double y)
+{
+    if (!waitingForGoal) {
+        return;
+    }
+    const missions::Goal& goal = *missionQueue[missionIndex].states[stateIndex].goal;
+    if (!sameGoal(goal, {x, y})) {
+        return;
+    }
     waitingForGoal = false;
+    lastReachedGoal = goal;
 }
 
 void MissionRunner::liftDone()
@@ -40,6 +57,9 @@ std::optional<missions::State> MissionRunner::step()
 {
     switch (state) {
         case MissionState::IDLE:
+            if (!systemReady) {
+                return std::nullopt;
+            }
             return startNextState();
         case MissionState::RUNNING:
             if (waitingForGoal || waitingForLift) {
@@ -111,9 +131,18 @@ std::optional<missions::State> MissionRunner::startNextState()
         return std::nullopt;
     }
 
-    const missions::State& next = missionQueue[missionIndex].states[stateIndex];
+    missions::State next = missionQueue[missionIndex].states[stateIndex];
+    // Already sitting at this goal, so drop it rather than wait on a report that won't come
+    if (next.goal && lastReachedGoal && sameGoal(*next.goal, *lastReachedGoal)) {
+        next.goal.reset();
+    }
     waitingForGoal = next.goal.has_value();
     waitingForLift = next.liftEnabled.has_value();
     state = MissionState::RUNNING;
     return next;
+}
+
+bool MissionRunner::sameGoal(const missions::Goal& a, const missions::Goal& b) const
+{
+    return std::hypot(a.x - b.x, a.y - b.y) < goalMatchTolerance;
 }

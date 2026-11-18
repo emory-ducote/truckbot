@@ -3,10 +3,12 @@
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "MissionRunner.h"
 #include "rclcpp/rclcpp.hpp"
+#include "geometry_msgs/msg/point_stamped.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "truckbot_msgs/msg/heartbeat.hpp"
 #include "truckbot_msgs/msg/mission_status.hpp"
+#include "truckbot_msgs/msg/system_health.hpp"
 
 class MissionRunnerMiddleware : public rclcpp::Node {
 
@@ -21,10 +23,11 @@ class MissionRunnerMiddleware : public rclcpp::Node {
 
       global_frame_ = this->declare_parameter<std::string>("global_frame", "map");
       int timer_period_ms = this->declare_parameter<int>("timer_period_ms", 100);
+      double goal_match_tolerance = this->declare_parameter<double>("goal_match_tolerance", 1e-3);
       std::string missions_file = this->declare_parameter<std::string>("missions_file",
           ament_index_cpp::get_package_share_directory("missions") + "/config/missions.yaml");
 
-      mission_runner_ = std::make_shared<MissionRunner>();
+      mission_runner_ = std::make_shared<MissionRunner>(goal_match_tolerance);
       try {
         mission_runner_->loadMissions(missions_file);
       } catch (const std::exception& e) {
@@ -38,10 +41,14 @@ class MissionRunnerMiddleware : public rclcpp::Node {
       actuator_pub_ = this->create_publisher<std_msgs::msg::Bool>("/cmd_actuator", 10);
       status_pub_ = this->create_publisher<truckbot_msgs::msg::MissionStatus>("/mission/status", 10);
 
-      goal_reached_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-          "/goal_reached", 10, [this](const std_msgs::msg::Bool::SharedPtr) { mission_runner_->goalReached(); });
+      goal_reached_sub_ = this->create_subscription<geometry_msgs::msg::PointStamped>(
+          "/goal_reached", 10, [this](const geometry_msgs::msg::PointStamped::SharedPtr msg) {
+            mission_runner_->goalReached(msg->point.x, msg->point.y);
+          });
       lift_done_sub_ = this->create_subscription<std_msgs::msg::Bool>(
           "/lift_done", 10, [this](const std_msgs::msg::Bool::SharedPtr) { mission_runner_->liftDone(); });
+      system_health_sub_ = this->create_subscription<truckbot_msgs::msg::SystemHealth>(
+          "/health/system", 10, std::bind(&MissionRunnerMiddleware::system_health_callback, this, std::placeholders::_1));
 
       mission_timer_ = this->create_wall_timer(
           std::chrono::milliseconds(timer_period_ms),
@@ -59,9 +66,19 @@ class MissionRunnerMiddleware : public rclcpp::Node {
       heartbeat_pub_->publish(heartbeat);
     }
 
+    void system_health_callback(const truckbot_msgs::msg::SystemHealth::SharedPtr msg)
+    {
+      if (msg->state == truckbot_msgs::msg::Heartbeat::GOOD) {
+        mission_runner_->setSystemReady();
+      }
+    }
+
     void mission_callback()
     {
+      // Stay GOOD while waiting, otherwise this node would hold the system out of GOOD forever
       health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
+      bool waiting_on_system = mission_runner_->getState() == MissionState::IDLE;
+      health_detail_ = waiting_on_system ? "waiting for system health" : "";
       auto state = mission_runner_->step();
       if (state) {
         RCLCPP_INFO(this->get_logger(), "Mission %s: entering state %s",
@@ -117,8 +134,9 @@ class MissionRunnerMiddleware : public rclcpp::Node {
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr actuator_pub_;
     rclcpp::Publisher<truckbot_msgs::msg::MissionStatus>::SharedPtr status_pub_;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr goal_reached_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr goal_reached_sub_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr lift_done_sub_;
+    rclcpp::Subscription<truckbot_msgs::msg::SystemHealth>::SharedPtr system_health_sub_;
     rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
     rclcpp::TimerBase::SharedPtr mission_timer_;
     rclcpp::TimerBase::SharedPtr heartbeat_timer_;

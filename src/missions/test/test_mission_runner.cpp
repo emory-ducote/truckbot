@@ -24,6 +24,7 @@ TEST(MissionRunner, NoMissionsCompletesImmediately)
 {
     MissionRunner runner;
     runner.loadMissions(writeMissions("no_missions.yaml", "{}\n"));
+    runner.setSystemReady();
     EXPECT_FALSE(runner.step().has_value());
     EXPECT_EQ(runner.getState(), MissionState::COMPLETE);
 }
@@ -42,6 +43,7 @@ Second:
     Goal: {x: 3.0, y: 4.0}
     LiftEnabled: false
 )"));
+    runner.setSystemReady();
 
     auto state = runner.step();
     ASSERT_TRUE(state.has_value());
@@ -51,7 +53,7 @@ Second:
     EXPECT_TRUE(runner.isWaitingForGoal());
     EXPECT_FALSE(runner.step().has_value());
 
-    runner.goalReached();
+    runner.goalReached(1.0, 2.0);
     state = runner.step();
     ASSERT_TRUE(state.has_value());
     EXPECT_EQ(state->name, "Raise");
@@ -66,7 +68,7 @@ Second:
     EXPECT_TRUE(state->goal.has_value());
     EXPECT_FALSE(*state->liftEnabled);
 
-    runner.goalReached();
+    runner.goalReached(3.0, 4.0);
     EXPECT_FALSE(runner.step().has_value());
     runner.liftDone();
     EXPECT_FALSE(runner.step().has_value());
@@ -78,8 +80,69 @@ TEST(MissionRunner, IgnoresDoneSignalsBeforeStart)
 {
     MissionRunner runner;
     runner.loadMissions(writeMissions("one_goal.yaml", "Only:\n  Drive:\n    Goal: {x: 1.0, y: 0.0}\n"));
-    runner.goalReached();
+    runner.setSystemReady();
+    runner.goalReached(1.0, 0.0);
     EXPECT_TRUE(runner.step().has_value());
     EXPECT_FALSE(runner.step().has_value());
     EXPECT_TRUE(runner.isWaitingForGoal());
+}
+
+TEST(MissionRunner, WaitsForSystemReady)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("one_goal.yaml", "Only:\n  Drive:\n    Goal: {x: 1.0, y: 0.0}\n"));
+    EXPECT_FALSE(runner.step().has_value());
+    EXPECT_EQ(runner.getState(), MissionState::IDLE);
+    runner.setSystemReady();
+    EXPECT_TRUE(runner.step().has_value());
+}
+
+TEST(MissionRunner, IgnoresReachedForOtherGoals)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("three_goals.yaml", R"(
+M:
+  A:
+    Goal: {x: 1.0, y: 0.0}
+  B:
+    Goal: {x: 2.0, y: 0.0}
+  C:
+    Goal: {x: 3.0, y: 0.0}
+)"));
+    runner.setSystemReady();
+    EXPECT_EQ(runner.step()->name, "A");
+
+    runner.goalReached(2.0, 0.0);
+    EXPECT_FALSE(runner.step().has_value());
+
+    runner.goalReached(1.0, 0.0);
+    EXPECT_EQ(runner.step()->name, "B");
+
+    // A repeated report for A must not finish B and skip to C
+    runner.goalReached(1.0, 0.0);
+    EXPECT_FALSE(runner.step().has_value());
+    EXPECT_TRUE(runner.isWaitingForGoal());
+}
+
+TEST(MissionRunner, DropsGoalAlreadyReached)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("repeat_goal.yaml", R"(
+M:
+  Drive:
+    Goal: {x: 1.0, y: 0.0}
+  RaiseHere:
+    Goal: {x: 1.0, y: 0.0}
+    LiftEnabled: true
+)"));
+    runner.setSystemReady();
+    runner.step();
+    runner.goalReached(1.0, 0.0);
+
+    auto state = runner.step();
+    ASSERT_TRUE(state.has_value());
+    EXPECT_EQ(state->name, "RaiseHere");
+    EXPECT_FALSE(state->goal.has_value());
+    EXPECT_FALSE(runner.isWaitingForGoal());
+    EXPECT_TRUE(runner.isWaitingForLift());
 }
