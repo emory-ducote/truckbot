@@ -146,3 +146,51 @@ M:
     EXPECT_FALSE(runner.isWaitingForGoal());
     EXPECT_TRUE(runner.isWaitingForLift());
 }
+
+TEST(MissionRunner, ErrorIgnoredBeforeSystemReady)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("one_goal.yaml", "Only:\n  Drive:\n    Goal: {x: 1.0, y: 0.0}\n"));
+    EXPECT_FALSE(runner.enterError());
+    EXPECT_EQ(runner.getState(), MissionState::IDLE);
+}
+
+TEST(MissionRunner, ErrorAbortsRunningState)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("goal_and_lift.yaml", R"(
+M:
+  DriveAndRaise:
+    Goal: {x: 1.0, y: 0.0}
+    LiftEnabled: true
+  Next:
+    Goal: {x: 2.0, y: 0.0}
+)"));
+    runner.setSystemReady();
+    runner.step();
+
+    EXPECT_TRUE(runner.enterError());
+    EXPECT_FALSE(runner.enterError());
+    EXPECT_EQ(runner.getState(), MissionState::ERROR);
+    EXPECT_FALSE(runner.isWaitingForGoal());
+    EXPECT_FALSE(runner.isWaitingForLift());
+    EXPECT_EQ(runner.getCurrentState()->name, "DriveAndRaise");
+
+    // Late done reports must not restart the mission
+    runner.goalReached(1.0, 0.0);
+    runner.liftDone();
+    EXPECT_FALSE(runner.step().has_value());
+    EXPECT_EQ(runner.getState(), MissionState::ERROR);
+}
+
+TEST(MissionRunner, ErrorIgnoredAfterComplete)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("one_lift.yaml", "Only:\n  Raise:\n    LiftEnabled: true\n"));
+    runner.setSystemReady();
+    runner.step();
+    runner.liftDone();
+    runner.step();
+    EXPECT_EQ(runner.getState(), MissionState::COMPLETE);
+    EXPECT_FALSE(runner.enterError());
+}

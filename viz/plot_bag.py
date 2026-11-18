@@ -55,7 +55,7 @@ ENCODER_TOPICS = [
 # each is kept, since the grids are republished whole as they fill in.
 MAP_TOPICS = ["/map", "/cost_grid"]
 # truckbot_msgs/MissionStatus state constants
-MISSION_IDLE, MISSION_RUNNING, MISSION_COMPLETE = 0, 1, 2
+MISSION_IDLE, MISSION_RUNNING, MISSION_COMPLETE, MISSION_ERROR = 0, 1, 2, 3
 
 
 def quat_to_yaw(x: float, y: float, z: float, w: float) -> float:
@@ -164,6 +164,8 @@ def load_bag(mcap_path: str) -> dict:
             mission["lift"].append(float(msg.waiting_for_lift))
             if msg.state == MISSION_RUNNING:
                 mission_labels.append(f"{msg.mission_name}/{msg.state_name}")
+            elif msg.state == MISSION_ERROR:
+                mission_labels.append(f"ERROR in {msg.mission_name}/{msg.state_name}")
             else:
                 mission_labels.append("complete" if msg.state == MISSION_COMPLETE else "idle")
 
@@ -389,12 +391,16 @@ def fig_dashboard(data: dict) -> go.Figure:
         # One bar per state, alternating colors so neighbouring states stand apart.
         state_colors = [("#1f77b4", "white"), ("#aec7e8", "black")]
         for i, (ts, te, label) in enumerate(runs(mt, mission_labels)):
-            color, text_color = (("#bbbbbb", "black") if label in ("idle", "complete")
-                                 else state_colors[i % 2])
+            if label.startswith("ERROR"):
+                color, text_color = "#d62728", "white"
+            elif label in ("idle", "complete"):
+                color, text_color = "#bbbbbb", "black"
+            else:
+                color, text_color = state_colors[i % 2]
             add(10, [ts, te], ["state", "state"], mode="lines",
                 line=dict(color=color, width=14), legendgroup="mission",
                 showlegend=False, hovertemplate=f"{label}<br>%{{x:.1f}} s<extra></extra>")
-            add(10, [(ts + te) / 2], ["state"], mode="text", text=[label.split("/")[-1]],
+            add(10, [(ts + te) / 2], ["state"], mode="text", text=["ERROR" if label.startswith("ERROR") else label.split("/")[-1]],
                 textposition="middle center", textfont=dict(color=text_color, size=10),
                 showlegend=False, hoverinfo="skip")
         for key, color in (("goal", "#ff7f0e"), ("lift", "#2ca02c")):

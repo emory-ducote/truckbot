@@ -15,6 +15,8 @@ Missions run in file order, and so do the states inside each mission. A state ca
 
 The first state is held until `/health/system` reports `GOOD`, so goals aren't sent before navigation is up. A `/goal_reached` report only counts if its coordinates match the current state's goal, which means a stale or repeated report can't skip a state. A state whose goal matches the goal just reached does not resend it.
 
+If `/health/system` reports `FAILED` after the mission has started, the runner goes to `ERROR`. On that transition it publishes `/goal_cancel` and `/lift_stop` once. `ERROR` is latched until the node restarts. The runner keeps reporting the interrupted state on `/mission/status` and reports itself `DEGRADED` on its heartbeat.
+
 ## Topics
 
 | Topic | Type | Direction |
@@ -23,6 +25,8 @@ The first state is held until `/health/system` reports `GOOD`, so goals aren't s
 | `/cmd_actuator` | `std_msgs/Bool` | Published |
 | `/goal_reached` | `geometry_msgs/PointStamped` | Subscribed (from `pure_pursuit_controller`) |
 | `/health/system` | `truckbot_msgs/SystemHealth` | Subscribed |
+| `/goal_cancel` | `std_msgs/Empty` | Published on entering `ERROR` |
+| `/lift_stop` | `std_msgs/Empty` | Published on entering `ERROR` |
 | `/lift_done` | `std_msgs/Bool` | Subscribed (from `motor_driver`) |
 | `/mission/status` | `truckbot_msgs/MissionStatus` | Published every tick |
 | `/health/heartbeat` | `truckbot_msgs/Heartbeat` | Published |

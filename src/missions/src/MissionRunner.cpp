@@ -3,7 +3,7 @@
 #include <stdexcept>
 
 MissionRunner::MissionRunner(double goalMatchTolerance)
-    : missionIndex(0), stateIndex(0), waitingForGoal(false), waitingForLift(false), systemReady(false),
+    : missionIndex(0), stateIndex(0), waitingForGoal(false), waitingForLift(false), systemReady(false), stateActive(false),
       goalMatchTolerance(goalMatchTolerance), state(MissionState::IDLE)
 {
 }
@@ -25,12 +25,26 @@ void MissionRunner::loadMissions(const std::string& path)
     waitingForGoal = false;
     waitingForLift = false;
     lastReachedGoal.reset();
+    stateActive = false;
     state = MissionState::IDLE;
 }
 
 void MissionRunner::setSystemReady()
 {
     systemReady = true;
+}
+
+// Returns true only on the transition, so the caller sends its stop commands once
+bool MissionRunner::enterError()
+{
+    // Failures before the mission starts are startup noise, and a finished mission has nothing to abort
+    if (!systemReady || state == MissionState::COMPLETE || state == MissionState::ERROR) {
+        return false;
+    }
+    waitingForGoal = false;
+    waitingForLift = false;
+    state = MissionState::ERROR;
+    return true;
 }
 
 // Only a report for the current goal counts, so stale or repeated reports can't skip states
@@ -68,6 +82,7 @@ std::optional<missions::State> MissionRunner::step()
             stateIndex++;
             return startNextState();
         case MissionState::COMPLETE:
+        case MissionState::ERROR:
             break;
     }
     return std::nullopt;
@@ -96,9 +111,10 @@ const missions::Mission* MissionRunner::getCurrentMission() const
     return &missionQueue[missionIndex];
 }
 
+// Still reports the interrupted state in ERROR so it shows which state was aborted
 const missions::State* MissionRunner::getCurrentState() const
 {
-    if (state != MissionState::RUNNING) {
+    if (!stateActive) {
         return nullptr;
     }
     return &missionQueue[missionIndex].states[stateIndex];
@@ -127,6 +143,7 @@ std::optional<missions::State> MissionRunner::startNextState()
         stateIndex = 0;
     }
     if (missionIndex >= missionQueue.size()) {
+        stateActive = false;
         state = MissionState::COMPLETE;
         return std::nullopt;
     }
@@ -138,6 +155,7 @@ std::optional<missions::State> MissionRunner::startNextState()
     }
     waitingForGoal = next.goal.has_value();
     waitingForLift = next.liftEnabled.has_value();
+    stateActive = true;
     state = MissionState::RUNNING;
     return next;
 }

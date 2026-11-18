@@ -6,6 +6,7 @@
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/empty.hpp"
 #include "truckbot_msgs/msg/heartbeat.hpp"
 #include "truckbot_msgs/msg/mission_status.hpp"
 #include "truckbot_msgs/msg/system_health.hpp"
@@ -40,6 +41,8 @@ class MissionRunnerMiddleware : public rclcpp::Node {
       goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
       actuator_pub_ = this->create_publisher<std_msgs::msg::Bool>("/cmd_actuator", 10);
       status_pub_ = this->create_publisher<truckbot_msgs::msg::MissionStatus>("/mission/status", 10);
+      goal_cancel_pub_ = this->create_publisher<std_msgs::msg::Empty>("/goal_cancel", 10);
+      lift_stop_pub_ = this->create_publisher<std_msgs::msg::Empty>("/lift_stop", 10);
 
       goal_reached_sub_ = this->create_subscription<geometry_msgs::msg::PointStamped>(
           "/goal_reached", 10, [this](const geometry_msgs::msg::PointStamped::SharedPtr msg) {
@@ -70,6 +73,10 @@ class MissionRunnerMiddleware : public rclcpp::Node {
     {
       if (msg->state == truckbot_msgs::msg::Heartbeat::GOOD) {
         mission_runner_->setSystemReady();
+      } else if (msg->state == truckbot_msgs::msg::Heartbeat::FAILED && mission_runner_->enterError()) {
+        RCLCPP_ERROR(this->get_logger(), "System health FAILED, aborting mission: clearing goal and stopping lift");
+        goal_cancel_pub_->publish(std_msgs::msg::Empty());
+        lift_stop_pub_->publish(std_msgs::msg::Empty());
       }
     }
 
@@ -79,6 +86,10 @@ class MissionRunnerMiddleware : public rclcpp::Node {
       health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
       bool waiting_on_system = mission_runner_->getState() == MissionState::IDLE;
       health_detail_ = waiting_on_system ? "waiting for system health" : "";
+      if (mission_runner_->getState() == MissionState::ERROR) {
+        health_state_ = truckbot_msgs::msg::Heartbeat::DEGRADED;
+        health_detail_ = "mission aborted on system failure";
+      }
       auto state = mission_runner_->step();
       if (state) {
         RCLCPP_INFO(this->get_logger(), "Mission %s: entering state %s",
@@ -101,6 +112,7 @@ class MissionRunnerMiddleware : public rclcpp::Node {
         case MissionState::IDLE: msg.state = truckbot_msgs::msg::MissionStatus::IDLE; break;
         case MissionState::RUNNING: msg.state = truckbot_msgs::msg::MissionStatus::RUNNING; break;
         case MissionState::COMPLETE: msg.state = truckbot_msgs::msg::MissionStatus::COMPLETE; break;
+        case MissionState::ERROR: msg.state = truckbot_msgs::msg::MissionStatus::ERROR; break;
       }
       if (const auto* mission = mission_runner_->getCurrentMission()) {
         msg.mission_name = mission->name;
@@ -134,6 +146,8 @@ class MissionRunnerMiddleware : public rclcpp::Node {
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr actuator_pub_;
     rclcpp::Publisher<truckbot_msgs::msg::MissionStatus>::SharedPtr status_pub_;
+    rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr goal_cancel_pub_;
+    rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr lift_stop_pub_;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr goal_reached_sub_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr lift_done_sub_;
     rclcpp::Subscription<truckbot_msgs::msg::SystemHealth>::SharedPtr system_health_sub_;

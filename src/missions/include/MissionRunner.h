@@ -8,7 +8,7 @@
 #include <yaml-cpp/yaml.h>
 #include "Mission.h"
 
-enum class MissionState { IDLE, RUNNING, COMPLETE };
+enum class MissionState { IDLE, RUNNING, COMPLETE, ERROR };
 
 class MissionRunner {
     public:
@@ -16,6 +16,7 @@ class MissionRunner {
 
         void loadMissions(const std::string& path);
         void setSystemReady();
+        bool enterError();
         void goalReached(double x, double y);
         void liftDone();
         std::optional<missions::State> step();
@@ -36,6 +37,7 @@ class MissionRunner {
         bool waitingForGoal;
         bool waitingForLift;
         bool systemReady;
+        bool stateActive;
         double goalMatchTolerance;
         std::optional<missions::Goal> lastReachedGoal;
         MissionState state;

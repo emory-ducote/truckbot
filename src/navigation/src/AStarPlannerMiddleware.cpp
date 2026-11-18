@@ -8,6 +8,7 @@
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "std_msgs/msg/empty.hpp"
 
 class AStarPlannerMiddleware : public rclcpp::Node {
 
@@ -40,6 +41,8 @@ class AStarPlannerMiddleware : public rclcpp::Node {
       goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
           goal_topic_, 10,
           std::bind(&AStarPlannerMiddleware::goal_callback, this, std::placeholders::_1));
+      goal_cancel_sub_ = this->create_subscription<std_msgs::msg::Empty>(
+          "/goal_cancel", 10, [this](const std_msgs::msg::Empty::SharedPtr) { goal_received_ = false; });
 
       navigation::TfPoseLookupConfig pose_config;
       pose_config.globalFrame = this->declare_parameter<std::string>("global_frame", pose_config.globalFrame);
@@ -186,6 +189,7 @@ class AStarPlannerMiddleware : public rclcpp::Node {
 
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr cost_grid_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
+    rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr goal_cancel_sub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
     rclcpp::TimerBase::SharedPtr replan_timer_;
     std::shared_ptr<AStarPlanner> a_star_planner_;

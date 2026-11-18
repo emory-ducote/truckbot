@@ -7,6 +7,7 @@
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include "std_msgs/msg/empty.hpp"
 #include "PurePursuitController.h"
 #include "TfPoseLookup.h"
 
@@ -46,6 +47,8 @@ public:
 		goal_reached_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_reached", 10);
 		goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
 			"/goal_pose", 10, std::bind(&PurePursuitControllerMiddleware::goal_callback, this, std::placeholders::_1));
+		goal_cancel_sub_ = this->create_subscription<std_msgs::msg::Empty>(
+			"/goal_cancel", 10, std::bind(&PurePursuitControllerMiddleware::goal_cancel_callback, this, std::placeholders::_1));
 		timer_ = this->create_wall_timer(
 			std::chrono::milliseconds(timer_period_ms),
 			std::bind(&PurePursuitControllerMiddleware::timerCallback, this));
@@ -67,6 +70,14 @@ private:
 		requested_goal_.header = msg->header;
 		requested_goal_.point = msg->pose.position;
 		have_requested_goal_ = true;
+	}
+
+	// Marking the goal done holds the robot still without reporting it reached; a new path end re-arms it
+	void goal_cancel_callback(const std_msgs::msg::Empty::SharedPtr)
+	{
+		mission_done = true;
+		have_requested_goal_ = false;
+		cmd_vel_pub_->publish(geometry_msgs::msg::Twist());
 	}
 
 	bool updatePoseFromTf()
@@ -188,6 +199,7 @@ private:
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr local_lookahead_pub_;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_reached_pub_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
+	rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr goal_cancel_sub_;
 	geometry_msgs::msg::PointStamped requested_goal_;
 	bool have_requested_goal_ = false;
 	rclcpp::TimerBase::SharedPtr timer_;

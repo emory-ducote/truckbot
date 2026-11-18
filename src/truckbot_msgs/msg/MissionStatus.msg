@@ -2,6 +2,7 @@
 uint8 IDLE=0
 uint8 RUNNING=1
 uint8 COMPLETE=2
+uint8 ERROR=3
 
 builtin_interfaces/Time stamp
 uint8 state

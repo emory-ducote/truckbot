@@ -10,6 +10,7 @@
 #include "truckbot_msgs/msg/heartbeat.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/empty.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_msgs/msg/float64.hpp"
 
@@ -92,6 +93,8 @@ class MotorDriverMiddleware : public rclcpp::Node {
           cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
               wheel_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdVelCallback, this, std::placeholders::_1));
           lift_done_pub_ = this->create_publisher<std_msgs::msg::Bool>("/lift_done", 10);
+          lift_stop_sub_ = this->create_subscription<std_msgs::msg::Empty>(
+              "/lift_stop", 10, std::bind(&MotorDriverMiddleware::lift_stop_callback, this, std::placeholders::_1));
           cmd_actuator_sub_ = this->create_subscription<std_msgs::msg::Bool>(
               actuator_control_topic, 10, std::bind(&MotorDriverMiddleware::cmdActuatorCallback, this, std::placeholders::_1));
 
@@ -162,6 +165,15 @@ class MotorDriverMiddleware : public rclcpp::Node {
           std::chrono::duration<double>(liftTravelTime),
           [this, actuatorEnabled]() { lift_done_callback(actuatorEnabled); });
       }
+      // Stopped mid-travel, so the lift never reports done
+      void lift_stop_callback(const std_msgs::msg::Empty::SharedPtr)
+      {
+        lift->setTargetSpeed(0.0);
+        if (lift_timer_) {
+          lift_timer_->cancel();
+        }
+        RCLCPP_WARN(this->get_logger(), "Lift stopped");
+      }
       void lift_done_callback(bool actuatorEnabled)
       {
         lift_timer_->cancel();
@@ -212,6 +224,7 @@ class MotorDriverMiddleware : public rclcpp::Node {
       double liftTravelTime;
       rclcpp::TimerBase::SharedPtr lift_timer_;
       rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr lift_done_pub_;
+      rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr lift_stop_sub_;
       rclcpp::TimerBase::SharedPtr heartbeat_timer_;
       rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
       uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
