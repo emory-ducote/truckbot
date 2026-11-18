@@ -1,0 +1,5 @@
+mission_runner:
+  ros__parameters:
+    global_frame: map
+    timer_period_ms: 100 # mission step period
+    # missions_file defaults to share/missions/config/missions.yaml

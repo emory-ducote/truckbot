@@ -1,0 +1,12 @@
+DeliverDrink:
+  Approach:
+    Goal: {x: 7.25, y: 0.0}
+  Deliver:
+    Goal: {x: 7.25, y: -1.5}
+    LiftEnabled: true
+  LowerAndLeave:
+    Goal: {x: 7.25, y: 0.0}
+    LiftEnabled: false
+  GoHome:
+    Goal: {x: 0.0, y: 0.0}
+
