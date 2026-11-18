@@ -21,6 +21,7 @@ Missions run in file order, and so do the states inside each mission. A state ca
 | `/cmd_actuator` | `std_msgs/Bool` | Published |
 | `/goal_reached` | `std_msgs/Bool` | Subscribed (from `pure_pursuit_controller`) |
 | `/lift_done` | `std_msgs/Bool` | Subscribed (from `motor_driver`) |
+| `/mission/status` | `truckbot_msgs/MissionStatus` | Published every tick |
 | `/health/heartbeat` | `truckbot_msgs/Heartbeat` | Published |
 
 ## Parameters

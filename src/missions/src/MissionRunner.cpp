@@ -76,6 +76,14 @@ const missions::Mission* MissionRunner::getCurrentMission() const
     return &missionQueue[missionIndex];
 }
 
+const missions::State* MissionRunner::getCurrentState() const
+{
+    if (state != MissionState::RUNNING) {
+        return nullptr;
+    }
+    return &missionQueue[missionIndex].states[stateIndex];
+}
+
 missions::State MissionRunner::parseState(const std::string& missionName, const std::string& stateName, const YAML::Node& node)
 {
     missions::State state;

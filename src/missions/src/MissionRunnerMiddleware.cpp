@@ -6,6 +6,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "truckbot_msgs/msg/heartbeat.hpp"
+#include "truckbot_msgs/msg/mission_status.hpp"
 
 class MissionRunnerMiddleware : public rclcpp::Node {
 
@@ -35,6 +36,7 @@ class MissionRunnerMiddleware : public rclcpp::Node {
 
       goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/goal_pose", 10);
       actuator_pub_ = this->create_publisher<std_msgs::msg::Bool>("/cmd_actuator", 10);
+      status_pub_ = this->create_publisher<truckbot_msgs::msg::MissionStatus>("/mission/status", 10);
 
       goal_reached_sub_ = this->create_subscription<std_msgs::msg::Bool>(
           "/goal_reached", 10, [this](const std_msgs::msg::Bool::SharedPtr) { mission_runner_->goalReached(); });
@@ -61,18 +63,37 @@ class MissionRunnerMiddleware : public rclcpp::Node {
     {
       health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
       auto state = mission_runner_->step();
-      if (!state) {
-        return;
+      if (state) {
+        RCLCPP_INFO(this->get_logger(), "Mission %s: entering state %s",
+            mission_runner_->getCurrentMission()->name.c_str(), state->name.c_str());
+        if (state->goal) {
+          send_goal(state->goal->x, state->goal->y);
+        }
+        if (state->liftEnabled) {
+          send_lift(*state->liftEnabled);
+        }
       }
+      publish_status();
+    }
 
-      RCLCPP_INFO(this->get_logger(), "Mission %s: entering state %s",
-          mission_runner_->getCurrentMission()->name.c_str(), state->name.c_str());
-      if (state->goal) {
-        send_goal(state->goal->x, state->goal->y);
+    void publish_status()
+    {
+      truckbot_msgs::msg::MissionStatus msg;
+      msg.stamp = this->now();
+      switch (mission_runner_->getState()) {
+        case MissionState::IDLE: msg.state = truckbot_msgs::msg::MissionStatus::IDLE; break;
+        case MissionState::RUNNING: msg.state = truckbot_msgs::msg::MissionStatus::RUNNING; break;
+        case MissionState::COMPLETE: msg.state = truckbot_msgs::msg::MissionStatus::COMPLETE; break;
       }
-      if (state->liftEnabled) {
-        send_lift(*state->liftEnabled);
+      if (const auto* mission = mission_runner_->getCurrentMission()) {
+        msg.mission_name = mission->name;
       }
+      if (const auto* current = mission_runner_->getCurrentState()) {
+        msg.state_name = current->name;
+      }
+      msg.waiting_for_goal = mission_runner_->isWaitingForGoal();
+      msg.waiting_for_lift = mission_runner_->isWaitingForLift();
+      status_pub_->publish(msg);
     }
 
     void send_goal(double x, double y)
@@ -95,6 +116,7 @@ class MissionRunnerMiddleware : public rclcpp::Node {
 
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr actuator_pub_;
+    rclcpp::Publisher<truckbot_msgs::msg::MissionStatus>::SharedPtr status_pub_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr goal_reached_sub_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr lift_done_sub_;
     rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;

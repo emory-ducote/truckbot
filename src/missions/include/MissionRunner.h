@@ -22,6 +22,7 @@ class MissionRunner {
         bool isWaitingForGoal() const;
         bool isWaitingForLift() const;
         const missions::Mission* getCurrentMission() const;
+        const missions::State* getCurrentState() const;
 
     private:
         static missions::State parseState(const std::string& missionName, const std::string& stateName, const YAML::Node& node);

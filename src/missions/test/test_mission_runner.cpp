@@ -55,6 +55,7 @@ Second:
     state = runner.step();
     ASSERT_TRUE(state.has_value());
     EXPECT_EQ(state->name, "Raise");
+    EXPECT_EQ(runner.getCurrentState()->name, "Raise");
     EXPECT_TRUE(*state->liftEnabled);
     EXPECT_TRUE(runner.isWaitingForLift());
 
@@ -70,6 +71,7 @@ Second:
     runner.liftDone();
     EXPECT_FALSE(runner.step().has_value());
     EXPECT_EQ(runner.getState(), MissionState::COMPLETE);
+    EXPECT_EQ(runner.getCurrentState(), nullptr);
 }
 
 TEST(MissionRunner, IgnoresDoneSignalsBeforeStart)
