@@ -25,6 +25,7 @@ TEST(MissionRunner, NoMissionsCompletesImmediately)
     MissionRunner runner;
     runner.loadMissions(writeMissions("no_missions.yaml", "{}\n"));
     runner.setSystemReady();
+    runner.requestStart();
     EXPECT_FALSE(runner.step().has_value());
     EXPECT_EQ(runner.getState(), MissionState::COMPLETE);
 }
@@ -44,6 +45,7 @@ Second:
     LiftEnabled: false
 )"));
     runner.setSystemReady();
+    runner.requestStart();
 
     auto state = runner.step();
     ASSERT_TRUE(state.has_value());
@@ -81,6 +83,7 @@ TEST(MissionRunner, IgnoresDoneSignalsBeforeStart)
     MissionRunner runner;
     runner.loadMissions(writeMissions("one_goal.yaml", "Only:\n  Drive:\n    Goal: {x: 1.0, y: 0.0}\n"));
     runner.setSystemReady();
+    runner.requestStart();
     runner.goalReached(1.0, 0.0);
     EXPECT_TRUE(runner.step().has_value());
     EXPECT_FALSE(runner.step().has_value());
@@ -94,6 +97,7 @@ TEST(MissionRunner, WaitsForSystemReady)
     EXPECT_FALSE(runner.step().has_value());
     EXPECT_EQ(runner.getState(), MissionState::IDLE);
     runner.setSystemReady();
+    EXPECT_TRUE(runner.requestStart());
     EXPECT_TRUE(runner.step().has_value());
 }
 
@@ -110,6 +114,7 @@ M:
     Goal: {x: 3.0, y: 0.0}
 )"));
     runner.setSystemReady();
+    runner.requestStart();
     EXPECT_EQ(runner.step()->name, "A");
 
     runner.goalReached(2.0, 0.0);
@@ -136,6 +141,7 @@ M:
     LiftEnabled: true
 )"));
     runner.setSystemReady();
+    runner.requestStart();
     runner.step();
     runner.goalReached(1.0, 0.0);
 
@@ -167,6 +173,7 @@ M:
     Goal: {x: 2.0, y: 0.0}
 )"));
     runner.setSystemReady();
+    runner.requestStart();
     runner.step();
 
     EXPECT_TRUE(runner.enterError());
@@ -188,9 +195,52 @@ TEST(MissionRunner, ErrorIgnoredAfterComplete)
     MissionRunner runner;
     runner.loadMissions(writeMissions("one_lift.yaml", "Only:\n  Raise:\n    LiftEnabled: true\n"));
     runner.setSystemReady();
+    runner.requestStart();
     runner.step();
     runner.liftDone();
     runner.step();
     EXPECT_EQ(runner.getState(), MissionState::COMPLETE);
     EXPECT_FALSE(runner.enterError());
+}
+
+TEST(MissionRunner, WaitsForStartRequest)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("one_goal.yaml", "Only:\n  Drive:\n    Goal: {x: 1.0, y: 0.0}\n"));
+    runner.setSystemReady();
+    EXPECT_TRUE(runner.isWaitingForStart());
+    EXPECT_FALSE(runner.step().has_value());
+    EXPECT_EQ(runner.getState(), MissionState::IDLE);
+
+    EXPECT_TRUE(runner.requestStart());
+    EXPECT_FALSE(runner.isWaitingForStart());
+    EXPECT_FALSE(runner.requestStart());
+    EXPECT_TRUE(runner.step().has_value());
+    EXPECT_EQ(runner.getState(), MissionState::RUNNING);
+    EXPECT_FALSE(runner.requestStart());
+}
+
+TEST(MissionRunner, StartRejectedBeforeSystemReady)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("one_goal.yaml", "Only:\n  Drive:\n    Goal: {x: 1.0, y: 0.0}\n"));
+    EXPECT_FALSE(runner.requestStart());
+    runner.setSystemReady();
+    // The early request was dropped, not latched
+    EXPECT_FALSE(runner.step().has_value());
+    EXPECT_TRUE(runner.isWaitingForStart());
+}
+
+TEST(MissionRunner, ErrorWhileWaitingForStartDropsRequest)
+{
+    MissionRunner runner;
+    runner.loadMissions(writeMissions("one_goal.yaml", "Only:\n  Drive:\n    Goal: {x: 1.0, y: 0.0}\n"));
+    runner.setSystemReady();
+    EXPECT_TRUE(runner.requestStart());
+    EXPECT_FALSE(runner.enterError());
+    EXPECT_EQ(runner.getState(), MissionState::IDLE);
+    EXPECT_FALSE(runner.step().has_value());
+    EXPECT_TRUE(runner.isWaitingForStart());
+    EXPECT_TRUE(runner.requestStart());
+    EXPECT_TRUE(runner.step().has_value());
 }

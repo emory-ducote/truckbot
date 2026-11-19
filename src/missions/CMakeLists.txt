@@ -14,6 +14,7 @@ find_package(rclcpp REQUIRED)
 find_package(truckbot_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
@@ -26,7 +27,7 @@ add_executable(mission_runner
   src/MissionRunner.cpp
 )
 target_link_libraries(mission_runner ${YAML_CPP_LIBRARIES})
-ament_target_dependencies(mission_runner rclcpp truckbot_msgs geometry_msgs std_msgs ament_index_cpp)
+ament_target_dependencies(mission_runner rclcpp truckbot_msgs geometry_msgs std_msgs std_srvs ament_index_cpp)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)

@@ -8,5 +8,6 @@ builtin_interfaces/Time stamp
 uint8 state
 string mission_name
 string state_name
+bool waiting_for_start # IDLE until /mission/start is accepted
 bool waiting_for_goal
 bool waiting_for_lift

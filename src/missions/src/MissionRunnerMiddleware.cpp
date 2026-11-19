@@ -7,6 +7,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/empty.hpp"
+#include "std_srvs/srv/trigger.hpp"
 #include "truckbot_msgs/msg/heartbeat.hpp"
 #include "truckbot_msgs/msg/mission_status.hpp"
 #include "truckbot_msgs/msg/system_health.hpp"
@@ -52,6 +53,8 @@ class MissionRunnerMiddleware : public rclcpp::Node {
           "/lift_done", 10, [this](const std_msgs::msg::Bool::SharedPtr) { mission_runner_->liftDone(); });
       system_health_sub_ = this->create_subscription<truckbot_msgs::msg::SystemHealth>(
           "/health/system", 10, std::bind(&MissionRunnerMiddleware::system_health_callback, this, std::placeholders::_1));
+      start_srv_ = this->create_service<std_srvs::srv::Trigger>(
+          "/mission/start", std::bind(&MissionRunnerMiddleware::start_callback, this, std::placeholders::_1, std::placeholders::_2));
 
       mission_timer_ = this->create_wall_timer(
           std::chrono::milliseconds(timer_period_ms),
@@ -71,6 +74,7 @@ class MissionRunnerMiddleware : public rclcpp::Node {
 
     void system_health_callback(const truckbot_msgs::msg::SystemHealth::SharedPtr msg)
     {
+      system_good_ = msg->state == truckbot_msgs::msg::Heartbeat::GOOD;
       if (msg->state == truckbot_msgs::msg::Heartbeat::GOOD) {
         mission_runner_->setSystemReady();
       } else if (msg->state == truckbot_msgs::msg::Heartbeat::FAILED && mission_runner_->enterError()) {
@@ -80,12 +84,35 @@ class MissionRunnerMiddleware : public rclcpp::Node {
       }
     }
 
+    void start_callback(const std::shared_ptr<std_srvs::srv::Trigger::Request>,
+                        std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+    {
+      if (!system_good_) {
+        response->success = false;
+        response->message = "system health is not GOOD";
+      } else if (mission_runner_->requestStart()) {
+        response->success = true;
+        response->message = "mission started";
+        RCLCPP_INFO(this->get_logger(), "Mission start requested");
+        return;
+      } else if (mission_runner_->getState() == MissionState::IDLE) {
+        response->success = false;
+        response->message = "mission already starting";
+      } else {
+        response->success = false;
+        response->message = "mission already started";
+      }
+      RCLCPP_WARN(this->get_logger(), "Mission start rejected: %s", response->message.c_str());
+    }
+
     void mission_callback()
     {
       // Stay GOOD while waiting, otherwise this node would hold the system out of GOOD forever
       health_state_ = truckbot_msgs::msg::Heartbeat::GOOD;
-      bool waiting_on_system = mission_runner_->getState() == MissionState::IDLE;
-      health_detail_ = waiting_on_system ? "waiting for system health" : "";
+      health_detail_ = "";
+      if (mission_runner_->getState() == MissionState::IDLE) {
+        health_detail_ = mission_runner_->isSystemReady() ? "waiting for start on /mission/start" : "waiting for system health";
+      }
       if (mission_runner_->getState() == MissionState::ERROR) {
         health_state_ = truckbot_msgs::msg::Heartbeat::DEGRADED;
         health_detail_ = "mission aborted on system failure";
@@ -120,6 +147,7 @@ class MissionRunnerMiddleware : public rclcpp::Node {
       if (const auto* current = mission_runner_->getCurrentState()) {
         msg.state_name = current->name;
       }
+      msg.waiting_for_start = mission_runner_->isWaitingForStart();
       msg.waiting_for_goal = mission_runner_->isWaitingForGoal();
       msg.waiting_for_lift = mission_runner_->isWaitingForLift();
       status_pub_->publish(msg);
@@ -151,11 +179,13 @@ class MissionRunnerMiddleware : public rclcpp::Node {
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr goal_reached_sub_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr lift_done_sub_;
     rclcpp::Subscription<truckbot_msgs::msg::SystemHealth>::SharedPtr system_health_sub_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr start_srv_;
     rclcpp::Publisher<truckbot_msgs::msg::Heartbeat>::SharedPtr heartbeat_pub_;
     rclcpp::TimerBase::SharedPtr mission_timer_;
     rclcpp::TimerBase::SharedPtr heartbeat_timer_;
     std::shared_ptr<MissionRunner> mission_runner_;
     std::string global_frame_;
+    bool system_good_ = false;
     uint8_t health_state_ = truckbot_msgs::msg::Heartbeat::INIT;
     std::string health_detail_;
 };

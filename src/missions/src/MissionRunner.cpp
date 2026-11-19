@@ -3,7 +3,7 @@
 #include <stdexcept>
 
 MissionRunner::MissionRunner(double goalMatchTolerance)
-    : missionIndex(0), stateIndex(0), waitingForGoal(false), waitingForLift(false), systemReady(false), stateActive(false),
+    : missionIndex(0), stateIndex(0), waitingForGoal(false), waitingForLift(false), systemReady(false), startRequested(false), stateActive(false),
       goalMatchTolerance(goalMatchTolerance), state(MissionState::IDLE)
 {
 }
@@ -25,6 +25,7 @@ void MissionRunner::loadMissions(const std::string& path)
     waitingForGoal = false;
     waitingForLift = false;
     lastReachedGoal.reset();
+    startRequested = false;
     stateActive = false;
     state = MissionState::IDLE;
 }
@@ -34,11 +35,26 @@ void MissionRunner::setSystemReady()
     systemReady = true;
 }
 
+// Only accepted once the system is ready, so an early press can't start the robot moving later unattended
+bool MissionRunner::requestStart()
+{
+    if (!systemReady || state != MissionState::IDLE || startRequested) {
+        return false;
+    }
+    startRequested = true;
+    return true;
+}
+
 // Returns true only on the transition, so the caller sends its stop commands once
 bool MissionRunner::enterError()
 {
-    // Failures before the mission starts are startup noise, and a finished mission has nothing to abort
-    if (!systemReady || state == MissionState::COMPLETE || state == MissionState::ERROR) {
+    // Before the mission starts there is nothing to abort, but drop a pending start so it isn't run on a failed system
+    if (state == MissionState::IDLE) {
+        startRequested = false;
+        return false;
+    }
+    // A finished mission has nothing to abort
+    if (state == MissionState::COMPLETE || state == MissionState::ERROR) {
         return false;
     }
     waitingForGoal = false;
@@ -71,7 +87,7 @@ std::optional<missions::State> MissionRunner::step()
 {
     switch (state) {
         case MissionState::IDLE:
-            if (!systemReady) {
+            if (!systemReady || !startRequested) {
                 return std::nullopt;
             }
             return startNextState();
@@ -101,6 +117,16 @@ bool MissionRunner::isWaitingForGoal() const
 bool MissionRunner::isWaitingForLift() const
 {
     return waitingForLift;
+}
+
+bool MissionRunner::isWaitingForStart() const
+{
+    return state == MissionState::IDLE && !startRequested;
+}
+
+bool MissionRunner::isSystemReady() const
+{
+    return systemReady;
 }
 
 const missions::Mission* MissionRunner::getCurrentMission() const

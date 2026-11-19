@@ -11,7 +11,7 @@ required) and writes a single self-contained HTML report containing:
   * IMU                - angular velocity and linear acceleration
   * Wheel encoders     - all four wheels
   * LiDAR              - range statistics over time
-  * Mission            - mission runner state and goal / lift waits
+  * Mission            - mission runner state, the wait for /mission/start, and goal / lift waits
   * Landmark slider    - heaviest-particle landmarks animated over time
 
 Usage:
@@ -54,6 +54,10 @@ ENCODER_TOPICS = [
 # OccupancyGrid topics drawn under the trajectory. Only the last message of
 # each is kept, since the grids are republished whole as they fill in.
 MAP_TOPICS = ["/map", "/cost_grid"]
+# Only these are decoded, so other recorded topics (e.g. std_msgs/Empty, which
+# rosbag2 writes with an empty schema) can't break the report
+PLOTTED_TOPICS = ["/odom", "/tf", "/heaviest_particle_pose", "/cmd_vel", "/imu", "/scan",
+                  "/heaviest_particle_landmarks", "/mission/status", *ENCODER_TOPICS, *MAP_TOPICS]
 # truckbot_msgs/MissionStatus state constants
 MISSION_IDLE, MISSION_RUNNING, MISSION_COMPLETE, MISSION_ERROR = 0, 1, 2, 3
 
@@ -92,10 +96,10 @@ def load_bag(mcap_path: str) -> dict:
     scan = defaultdict(list)          # t, rmin, rmean, rmax, valid
     landmarks = []                    # per-frame: {t, x[], y[]} for the slider
     grids = {}                        # topic -> latest OccupancyGrid as arrays
-    mission = defaultdict(list)       # t, goal, lift (waiting flags as 0/1)
+    mission = defaultdict(list)       # t, start, goal, lift (waiting flags as 0/1)
     mission_labels = []               # state label per mission sample
 
-    for m in read_ros2_messages(mcap_path):
+    for m in read_ros2_messages(mcap_path, topics=PLOTTED_TOPICS):
         topic = m.channel.topic
         t = m.log_time_ns * 1e-9
         msg = m.ros_msg
@@ -160,6 +164,8 @@ def load_bag(mcap_path: str) -> dict:
 
         elif topic == "/mission/status":
             mission["t"].append(t)
+            # Older bags predate waiting_for_start
+            mission["start"].append(float(getattr(msg, "waiting_for_start", False)))
             mission["goal"].append(float(msg.waiting_for_goal))
             mission["lift"].append(float(msg.waiting_for_lift))
             if msg.state == MISSION_RUNNING:
@@ -403,7 +409,7 @@ def fig_dashboard(data: dict) -> go.Figure:
             add(10, [(ts + te) / 2], ["state"], mode="text", text=["ERROR" if label.startswith("ERROR") else label.split("/")[-1]],
                 textposition="middle center", textfont=dict(color=text_color, size=10),
                 showlegend=False, hoverinfo="skip")
-        for key, color in (("goal", "#ff7f0e"), ("lift", "#2ca02c")):
+        for key, color in (("start", "#9467bd"), ("goal", "#ff7f0e"), ("lift", "#2ca02c")):
             xs, ys = [], []
             for ts, te, waiting in runs(mt, list(mission[key])):
                 if waiting:
@@ -411,8 +417,15 @@ def fig_dashboard(data: dict) -> go.Figure:
                     ys += [f"wait {key}", f"wait {key}", None]
             add(10, xs, ys, mode="lines", name=f"wait {key}",
                 legendgroup="mission", line=dict(color=color, width=14))
+        # The start service call itself isn't in the bag; it shows as the wait ending
+        start_wait = mission["start"]
+        starts = [mt[i] for i in range(1, len(mt)) if start_wait[i - 1] and not start_wait[i]]
+        add(10, starts, ["wait start"] * len(starts), mode="markers+text",
+            name="/mission/start", legendgroup="mission", text=["start"] * len(starts),
+            textposition="top center", marker=dict(symbol="star", size=14, color="#9467bd",
+            line=dict(color="black", width=1)), hovertemplate="mission started<br>%{x:.1f} s<extra></extra>")
         fig.update_yaxes(type="category",
-                         categoryarray=["wait lift", "wait goal", "state"],
+                         categoryarray=["wait lift", "wait goal", "wait start", "state"],
                          row=10, col=2)
 
     fig.update_xaxes(title_text="time [s]", row=nrows, col=2)

@@ -7,7 +7,9 @@ from flask import Flask, jsonify, render_template
 
 class Dashboard:
 
-    def __init__(self):
+    def __init__(self, deliver=None):
+        # deliver is called with no arguments and returns (success, message)
+        self.deliver = deliver
         self.lock = threading.Lock()
         self.state = None
         self.modules = []
@@ -41,5 +43,12 @@ class Dashboard:
         @app.route('/status')
         def status():
             return jsonify(self.getStatus())
+
+        @app.route('/deliver', methods=['POST'])
+        def deliver():
+            if self.deliver is None:
+                return jsonify({'success': False, 'message': 'deliver not available'})
+            success, message = self.deliver()
+            return jsonify({'success': success, 'message': message})
 
         return app

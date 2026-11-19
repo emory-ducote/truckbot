@@ -16,6 +16,7 @@ class MissionRunner {
 
         void loadMissions(const std::string& path);
         void setSystemReady();
+        bool requestStart();
         bool enterError();
         void goalReached(double x, double y);
         void liftDone();
@@ -23,6 +24,8 @@ class MissionRunner {
         MissionState getState() const;
         bool isWaitingForGoal() const;
         bool isWaitingForLift() const;
+        bool isWaitingForStart() const;
+        bool isSystemReady() const;
         const missions::Mission* getCurrentMission() const;
         const missions::State* getCurrentState() const;
 
@@ -37,6 +40,7 @@ class MissionRunner {
         bool waitingForGoal;
         bool waitingForLift;
         bool systemReady;
+        bool startRequested;
         bool stateActive;
         double goalMatchTolerance;
         std::optional<missions::Goal> lastReachedGoal;

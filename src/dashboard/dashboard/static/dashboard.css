@@ -9,3 +9,8 @@ body { font-family: sans-serif; background: #1e1e1e; color: #eee; margin: 16px; 
 .DEGRADED { background: #ffc107; }
 .FAILED { background: #f44336; }
 .INIT, .STALE { background: #9e9e9e; }
+#controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+#deliver { padding: 12px 32px; font-size: 1.2em; font-weight: bold; border: none; border-radius: 8px; background: #2196f3; color: #fff; cursor: pointer; }
+#deliver:disabled { opacity: 0.5; cursor: default; }
+#deliver-result.ok { color: #4caf50; }
+#deliver-result.err { color: #f44336; }

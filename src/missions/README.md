@@ -13,7 +13,7 @@ PickupAndReturn:
 
 Missions run in file order, and so do the states inside each mission. A state can set `Goal` (sent on `/goal_pose`), `LiftEnabled` (sent on `/cmd_actuator`), or both. Every timer tick checks the current state. Once each action it started has reported done (`/goal_reached`, `/lift_done`), the next state is dispatched.
 
-The first state is held until `/health/system` reports `GOOD`, so goals aren't sent before navigation is up. A `/goal_reached` report only counts if its coordinates match the current state's goal, which means a stale or repeated report can't skip a state. A state whose goal matches the goal just reached does not resend it.
+The first state is held until `/health/system` reports `GOOD` and the `/mission/start` service is called (the dashboard's Deliver button calls it). A start request is rejected unless `/health/system` is currently `GOOD`, and is dropped if the system reports `FAILED` before the first state is dispatched, so an early press can't start the robot moving later. A `/goal_reached` report only counts if its coordinates match the current state's goal, which means a stale or repeated report can't skip a state. A state whose goal matches the goal just reached does not resend it.
 
 If `/health/system` reports `FAILED` after the mission has started, the runner goes to `ERROR`. On that transition it publishes `/goal_cancel` and `/lift_stop` once. `ERROR` is latched until the node restarts. The runner keeps reporting the interrupted state on `/mission/status` and reports itself `DEGRADED` on its heartbeat.
 
@@ -28,7 +28,8 @@ If `/health/system` reports `FAILED` after the mission has started, the runner g
 | `/goal_cancel` | `std_msgs/Empty` | Published on entering `ERROR` |
 | `/lift_stop` | `std_msgs/Empty` | Published on entering `ERROR` |
 | `/lift_done` | `std_msgs/Bool` | Subscribed (from `motor_driver`) |
-| `/mission/status` | `truckbot_msgs/MissionStatus` | Published every tick |
+| `/mission/status` | `truckbot_msgs/MissionStatus` | Published every tick, including `waiting_for_start` |
+| `/mission/start` | `std_srvs/Trigger` | Service, starts the missions |
 | `/health/heartbeat` | `truckbot_msgs/Heartbeat` | Published |
 
 ## Parameters
@@ -49,5 +50,6 @@ See `config/mission_runner.yaml`.
 - truckbot_msgs
 - geometry_msgs
 - std_msgs
+- std_srvs
 - ament_index_cpp
 - yaml-cpp
