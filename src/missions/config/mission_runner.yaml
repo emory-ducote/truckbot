@@ -1,0 +1,6 @@
+mission_runner:
+  ros__parameters:
+    global_frame: map
+    timer_period_ms: 100 # mission step period
+    goal_match_tolerance: 0.001 # meters, a /goal_reached report must be this close to the current goal
+    # missions_file defaults to share/missions/config/missions.yaml

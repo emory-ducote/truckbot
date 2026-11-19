@@ -5,6 +5,7 @@ motor_driver:
     max_wheel_motor_rpm: 251
     wheel_control_topic: "/cmd_vel"
     actuator_control_topic: "/cmd_actuator"
+    lift_travel_time: 30.0 
     Kp: 2.0
     Ki: 2.0
     Kd: 0.0

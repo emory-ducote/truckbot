@@ -40,5 +40,24 @@ async function refresh() {
   }
 }
 
+async function deliver() {
+  const button = document.getElementById('deliver');
+  const result = document.getElementById('deliver-result');
+  button.disabled = true;
+  result.className = '';
+  result.textContent = 'Sending...';
+  try {
+    const response = await (await fetch('/deliver', {method: 'POST'})).json();
+    result.className = response.success ? 'ok' : 'err';
+    result.textContent = response.message;
+  } catch (e) {
+    result.className = 'err';
+    result.textContent = 'Dashboard unreachable';
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.getElementById('deliver').addEventListener('click', deliver);
 refresh();
 setInterval(refresh, POLL_MS);

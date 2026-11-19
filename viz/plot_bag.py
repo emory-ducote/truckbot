@@ -11,6 +11,7 @@ required) and writes a single self-contained HTML report containing:
   * IMU                - angular velocity and linear acceleration
   * Wheel encoders     - all four wheels
   * LiDAR              - range statistics over time
+  * Mission            - mission runner state, the wait for /mission/start, and goal / lift waits
   * Landmark slider    - heaviest-particle landmarks animated over time
 
 Usage:
@@ -53,6 +54,12 @@ ENCODER_TOPICS = [
 # OccupancyGrid topics drawn under the trajectory. Only the last message of
 # each is kept, since the grids are republished whole as they fill in.
 MAP_TOPICS = ["/map", "/cost_grid"]
+# Only these are decoded, so other recorded topics (e.g. std_msgs/Empty, which
+# rosbag2 writes with an empty schema) can't break the report
+PLOTTED_TOPICS = ["/odom", "/tf", "/heaviest_particle_pose", "/cmd_vel", "/imu", "/scan",
+                  "/heaviest_particle_landmarks", "/mission/status", *ENCODER_TOPICS, *MAP_TOPICS]
+# truckbot_msgs/MissionStatus state constants
+MISSION_IDLE, MISSION_RUNNING, MISSION_COMPLETE, MISSION_ERROR = 0, 1, 2, 3
 
 
 def quat_to_yaw(x: float, y: float, z: float, w: float) -> float:
@@ -89,8 +96,10 @@ def load_bag(mcap_path: str) -> dict:
     scan = defaultdict(list)          # t, rmin, rmean, rmax, valid
     landmarks = []                    # per-frame: {t, x[], y[]} for the slider
     grids = {}                        # topic -> latest OccupancyGrid as arrays
+    mission = defaultdict(list)       # t, start, goal, lift (waiting flags as 0/1)
+    mission_labels = []               # state label per mission sample
 
-    for m in read_ros2_messages(mcap_path):
+    for m in read_ros2_messages(mcap_path, topics=PLOTTED_TOPICS):
         topic = m.channel.topic
         t = m.log_time_ns * 1e-9
         msg = m.ros_msg
@@ -153,6 +162,19 @@ def load_bag(mcap_path: str) -> dict:
             ys = np.array([mk.pose.position.y for mk in msg.markers], dtype=float)
             landmarks.append({"t": t, "x": xs, "y": ys})
 
+        elif topic == "/mission/status":
+            mission["t"].append(t)
+            # Older bags predate waiting_for_start
+            mission["start"].append(float(getattr(msg, "waiting_for_start", False)))
+            mission["goal"].append(float(msg.waiting_for_goal))
+            mission["lift"].append(float(msg.waiting_for_lift))
+            if msg.state == MISSION_RUNNING:
+                mission_labels.append(f"{msg.mission_name}/{msg.state_name}")
+            elif msg.state == MISSION_ERROR:
+                mission_labels.append(f"ERROR in {msg.mission_name}/{msg.state_name}")
+            else:
+                mission_labels.append("complete" if msg.state == MISSION_COMPLETE else "idle")
+
         elif topic in MAP_TOPICS:
             info = msg.info
             cells = np.asarray(bytearray(msg.data) if isinstance(msg.data, bytes)
@@ -165,7 +187,7 @@ def load_bag(mcap_path: str) -> dict:
             }
 
     # Normalise all timelines to seconds from the earliest stamp.
-    starts = [s["t"][0] for s in (odom, odom_vel, pf, cmd, imu, scan) if s.get("t")]
+    starts = [s["t"][0] for s in (odom, odom_vel, pf, cmd, imu, scan, mission) if s.get("t")]
     starts += [e["t"][0] for e in enc.values() if e.get("t")]
     starts += [landmarks[0]["t"]] if landmarks else []
     t0 = min(starts) if starts else 0.0
@@ -189,6 +211,8 @@ def load_bag(mcap_path: str) -> dict:
         "scan": to_np(scan),
         "landmarks": landmarks,
         "grids": grids,
+        "mission": to_np(mission),
+        "mission_labels": mission_labels,
     }
 
 
@@ -207,7 +231,21 @@ DYNAMICS_ROWS = [
     "IMU lin. acc [m/s^2]",
     "encoders",
     "LiDAR range [m]",
+    "mission",
 ]
+
+
+def runs(t, keys):
+    """Split a timeline into runs of equal keys as (t_start, t_end, key)."""
+    out = []
+    start = 0
+    for i in range(1, len(keys) + 1):
+        if i == len(keys) or keys[i] != keys[start]:
+            # A run ends where the next one begins, so bars meet without gaps.
+            end_t = t[i] if i < len(keys) else t[-1]
+            out.append((t[start], end_t, keys[start]))
+            start = i
+    return out
 
 
 def grid_crop(grids: dict, pts_x, pts_y, margin: float = 1.0):
@@ -254,6 +292,7 @@ def fig_dashboard(data: dict) -> go.Figure:
     odom, odom_vel = data["odom"], data["odom_vel"]
     pf, cmd = data["pf"], data["cmd"]
     imu, enc, scan = data["imu"], data["enc"], data["scan"]
+    mission, mission_labels = data["mission"], data["mission_labels"]
     nrows = len(DYNAMICS_ROWS)
 
     # Left column: a single trajectory cell spanning every row. Right column:
@@ -353,11 +392,46 @@ def fig_dashboard(data: dict) -> go.Figure:
         for key, color in (("rmin", "#2ca02c"), ("rmean", "#1f77b4"),
                            ("rmax", "#d62728")):
             add(9, scan["t"], scan[key], name=key, line=dict(color=color))
+    if len(mission.get("t", [])):
+        mt = mission["t"]
+        # One bar per state, alternating colors so neighbouring states stand apart.
+        state_colors = [("#1f77b4", "white"), ("#aec7e8", "black")]
+        for i, (ts, te, label) in enumerate(runs(mt, mission_labels)):
+            if label.startswith("ERROR"):
+                color, text_color = "#d62728", "white"
+            elif label in ("idle", "complete"):
+                color, text_color = "#bbbbbb", "black"
+            else:
+                color, text_color = state_colors[i % 2]
+            add(10, [ts, te], ["state", "state"], mode="lines",
+                line=dict(color=color, width=14), legendgroup="mission",
+                showlegend=False, hovertemplate=f"{label}<br>%{{x:.1f}} s<extra></extra>")
+            add(10, [(ts + te) / 2], ["state"], mode="text", text=["ERROR" if label.startswith("ERROR") else label.split("/")[-1]],
+                textposition="middle center", textfont=dict(color=text_color, size=10),
+                showlegend=False, hoverinfo="skip")
+        for key, color in (("start", "#9467bd"), ("goal", "#ff7f0e"), ("lift", "#2ca02c")):
+            xs, ys = [], []
+            for ts, te, waiting in runs(mt, list(mission[key])):
+                if waiting:
+                    xs += [ts, te, None]
+                    ys += [f"wait {key}", f"wait {key}", None]
+            add(10, xs, ys, mode="lines", name=f"wait {key}",
+                legendgroup="mission", line=dict(color=color, width=14))
+        # The start service call itself isn't in the bag; it shows as the wait ending
+        start_wait = mission["start"]
+        starts = [mt[i] for i in range(1, len(mt)) if start_wait[i - 1] and not start_wait[i]]
+        add(10, starts, ["wait start"] * len(starts), mode="markers+text",
+            name="/mission/start", legendgroup="mission", text=["start"] * len(starts),
+            textposition="top center", marker=dict(symbol="star", size=14, color="#9467bd",
+            line=dict(color="black", width=1)), hovertemplate="mission started<br>%{x:.1f} s<extra></extra>")
+        fig.update_yaxes(type="category",
+                         categoryarray=["wait lift", "wait goal", "wait start", "state"],
+                         row=10, col=2)
 
     fig.update_xaxes(title_text="time [s]", row=nrows, col=2)
     fig.update_layout(
         title="truckbot dynamics",
-        height=1300,
+        height=1450,
         legend=dict(orientation="v", yanchor="top", y=1.0, xanchor="left", x=1.02),
         margin=dict(t=80, r=140),
     )
@@ -533,6 +607,7 @@ def main() -> None:
         "cmd_vel": len(data["cmd"].get("t", [])),
         "imu": len(data["imu"].get("t", [])),
         "scan": len(data["scan"].get("t", [])),
+        "mission": len(data["mission"].get("t", [])),
     }
     print("Messages plotted:", ", ".join(f"{k}={v}" for k, v in counts.items()))
 

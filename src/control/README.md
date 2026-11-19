@@ -49,8 +49,11 @@ Receives velocity and actuator commands and drives the motors via GPIO PWM. Runs
 - **Subscribed topics:**
   - `/cmd_vel` (`geometry_msgs/msg/Twist`): target linear and angular velocity
   - `/cmd_actuator` (`std_msgs/msg/Bool`): `true` raises the lift, `false` lowers it
+  - `/lift_stop` (`std_msgs/msg/Empty`): stops the lift where it is; no `/lift_done` follows
   - `/encoder/left_front`, `/encoder/left_rear`, `/encoder/right_front`, `/encoder/right_rear` (`std_msgs/msg/Float64`): measured wheel speeds from `encoder_driver`
-- **Published topics:** None
+- **Published topics:**
+  - `/lift_done` (`std_msgs/msg/Bool`): published `lift_travel_time` after a lift command, carrying the commanded direction
+  - `/motor_duty/left_front`, `/motor_duty/left_rear`, `/motor_duty/right_front`, `/motor_duty/right_rear` (`std_msgs/msg/Float64`): commanded duty per wheel
 - **Parameters:**
   - `vehicle_width` (double, default: `0.2`): track width in meters, used for skid-steer kinematics
   - `wheel_radius` (double, default: `0.05`): wheel radius in meters
@@ -59,6 +62,7 @@ Receives velocity and actuator commands and drives the motors via GPIO PWM. Runs
   - `deadband` (double, default: `0.02`): minimum command magnitude before output is applied
   - `wheel_control_topic` (string, default: `/cmd_vel`)
   - `actuator_control_topic` (string, default: `/cmd_actuator`)
+  - `lift_travel_time` (double, default: `5.0`): seconds after a lift command before `/lift_done` is published
   - GPIO pin parameters: `chip`, `right_front_one/two`, `right_rear_one/two`, `left_front_one/two`, `left_rear_one/two`, `lift_one/two`
 
 ### encoder_driver

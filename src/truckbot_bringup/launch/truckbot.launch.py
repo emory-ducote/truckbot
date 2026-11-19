@@ -42,6 +42,7 @@ def generate_launch_description():
     imu_dir = get_package_share_directory('icm20948_driver')
     health_dir = get_package_share_directory('health')
     dashboard_dir = get_package_share_directory('dashboard')
+    missions_dir = get_package_share_directory('missions')
     rplidar_dir = get_package_share_directory('rplidar_ros')
     bringup_dir = get_package_share_directory('truckbot_bringup')
 
@@ -113,6 +114,11 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(dashboard_dir, 'launch', 'dashboard.launch.py')
+            )
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(missions_dir, 'launch', 'mission_runner.launch.py')
             )
         ),
     ]

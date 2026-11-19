@@ -89,10 +89,13 @@ Implements a pure pursuit controller that tracks the local path and publishes ve
 - **Subscribed topics:**
   - `/heaviest_particle_pose` (`geometry_msgs/msg/PoseStamped`): map-frame vehicle pose from particle filter
   - `/local_path` (`nav_msgs/msg/Path`): local path from `spline_generator`
+  - `/goal_pose` (`geometry_msgs/msg/PoseStamped`): requested goal, echoed back on `/goal_reached`
+  - `/goal_cancel` (`std_msgs/msg/Empty`): stop and hold until a goal with a new path end arrives
 - **Published topics:**
   - `/cmd_vel` (`geometry_msgs/msg/Twist`): commanded linear and angular velocity
   - `/global_lookahead` (`geometry_msgs/msg/PointStamped`): lookahead point in map frame (debug)
   - `/local_lookahead` (`geometry_msgs/msg/PointStamped`): lookahead point in vehicle frame (debug)
+  - `/goal_reached` (`geometry_msgs/msg/PointStamped`): requested goal coordinates, published once when the vehicle stops at it
 - **Parameters:**
   - `lookahead_distance` (double, default: `0.5`): pure pursuit lookahead distance in meters
 
